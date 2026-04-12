@@ -1,0 +1,27 @@
+flowchart TB
+    subgraph Client["前端（瀏覽器）"]
+        UI["UI Layer\n(React)"]
+        Calc["PortfolioCalculator"]
+        Repo["Repository Layer\n(IndexedDB)"]
+        SW["Service Worker\n(排程 + 通知)"]
+    end
+
+    subgraph Storage["本地儲存"]
+        IDB[("IndexedDB\ntransactions\nsplit_events\nalerts\nprice_cache")]
+    end
+
+    subgraph ExternalAPIs["外部 API"]
+        FM["FinMind API\n（台股歷史股價）"]
+        YF["Yahoo Finance\n（美股歷史股價）"]
+        FX["ExchangeRate API\n（USD/TWD 匯率）"]
+    end
+
+    UI --> Calc
+    UI --> Repo
+    Calc --> Repo
+    Repo <--> IDB
+    SW --> Repo
+    SW -->|"每日定時拉取"| FM
+    SW -->|"每日定時拉取"| YF
+    SW -->|"每日定時拉取"| FX
+    SW -->|"比對停損停利\n顯示通知"| UI

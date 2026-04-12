@@ -1,0 +1,29 @@
+sequenceDiagram
+    participant SW as Service Worker
+    participant IDB as IndexedDB
+    participant FM as FinMind API
+    participant YF as Yahoo Finance API
+
+    Note over SW: 每日排程觸發<br/>台股 09:05 / 美股 22:35
+
+    SW->>IDB: 讀取所有持倉 ticker 清單
+    IDB-->>SW: [0050, 2330, AAPL, ...]
+
+    SW->>IDB: 查詢今日是否已有快取
+    IDB-->>SW: 無快取（或快取已過期）
+
+    par 台股（上市 / 上櫃）
+        SW->>FM: GET TaiwanStockPrice<br/>data_id=0050&date=today
+        FM-->>SW: { open: 185.5, date: "2026-04-11" }
+        SW->>IDB: upsertPrice(0050, open, date)
+    and 美股
+        SW->>YF: GET /chart/AAPL?interval=1d&range=5d
+        YF-->>SW: { timestamp, open: [210.3, ...] }
+        SW->>IDB: upsertPrice(AAPL, open, date)
+    end
+
+    SW->>SW: 比對所有 Alert 條件
+    alt 觸發停損或停利
+        SW->>SW: showNotification(...)
+        SW->>IDB: 寫入 alert_history
+    end

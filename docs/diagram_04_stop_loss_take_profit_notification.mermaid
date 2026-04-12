@@ -1,0 +1,27 @@
+sequenceDiagram
+    participant SW as Service Worker
+    participant IDB as IndexedDB
+    participant Browser as 瀏覽器通知
+
+    Note over SW: 每日股價更新完成後觸發
+
+    SW->>IDB: getAlerts（所有 isActive=true）
+    IDB-->>SW: [{ ticker, stopLoss, takeProfit, repeat }, ...]
+
+    loop 每一筆 Alert
+        SW->>IDB: getLatestPrice(ticker)
+        IDB-->>SW: { open: 185.0 }
+
+        alt 開盤價 ≤ stopLossPrice
+            SW->>Browser: showNotification("【停損觸發】\n0050 開盤 $185.0 < 停損 $190.0")
+            SW->>IDB: 寫入 alert_history
+            alt repeat = false
+                SW->>IDB: setAlertTriggered(id)
+            end
+        else 開盤價 ≥ takeProfitPrice
+            SW->>Browser: showNotification("【停利觸發】\n0050 開盤 $195.0 > 停利 $192.0")
+            SW->>IDB: 寫入 alert_history
+        else 未觸發
+            Note over SW: 不動作
+        end
+    end

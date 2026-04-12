@@ -1,0 +1,17 @@
+flowchart TD
+    A(["使用者開啟儀表板"]) --> B["讀取 transactions"]
+    B --> C["讀取 split_events"]
+    C --> D["依 ticker 分組"]
+
+    D --> E["對每支股票：\n依時間排序所有交易"]
+    E --> F{"有拆分事件？"}
+
+    F -- 是 --> G["計算每筆交易的\nSplit Adjustment Factor\n= ∏ 所有該交易後的拆分比例"]
+    G --> H["調整後股數 = 原始股數 × factor\n調整後成本 = 原始成本 ÷ factor"]
+    F -- 否 --> H
+
+    H --> I["計算加權平均成本\navgCost = Σ(調整成本) / Σ(調整股數)"]
+    I --> J["讀取 price_cache\n取當日開盤價"]
+    J --> K["currentValue = 現價 × 總持股數"]
+    K --> L["unrealizedPnL = currentValue − totalCost"]
+    L --> M(["回傳 Holding 物件\n渲染到 UI"])
