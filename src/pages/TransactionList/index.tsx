@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { TransactionRepository } from '../../db/TransactionRepository'
+import { transactionsToCSV, downloadCSV } from '../../utils/csv'
 import type { Transaction, TransactionType } from '../../types'
 
 const TYPE_LABELS: Record<TransactionType, string> = {
@@ -45,12 +46,23 @@ export default function TransactionList() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold">Transactions</h2>
-        <Link
-          to="/transactions/new"
-          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-        >
-          + Add
-        </Link>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              const date = new Date().toISOString().slice(0, 10)
+              downloadCSV(transactionsToCSV(transactions), `guguji_export_${date}.csv`)
+            }}
+            className="px-3 py-1.5 text-sm rounded border hover:bg-gray-50"
+          >
+            Export CSV
+          </button>
+          <Link
+            to="/transactions/new"
+            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+          >
+            + Add
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
