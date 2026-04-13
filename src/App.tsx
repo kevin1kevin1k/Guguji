@@ -1,3 +1,4 @@
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
 import TransactionList from './pages/TransactionList'
 import AddTransaction from './pages/AddTransaction'
@@ -7,28 +8,29 @@ import Alerts from './pages/Alerts'
 import AlertHistory from './pages/AlertHistory'
 import Settings from './pages/Settings'
 
-const PAGES = [
-  { name: 'Dashboard', component: Dashboard },
-  { name: 'TransactionList', component: TransactionList },
-  { name: 'AddTransaction', component: AddTransaction },
-  { name: 'StockDetail', component: StockDetail },
-  { name: 'SplitEvents', component: SplitEvents },
-  { name: 'Alerts', component: Alerts },
-  { name: 'AlertHistory', component: AlertHistory },
-  { name: 'Settings', component: Settings },
-]
-
 export default function App() {
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">股股記 Guguji</h1>
-      <ul className="space-y-2">
-        {PAGES.map(({ name }) => (
-          <li key={name} className="text-blue-600 underline cursor-pointer">
-            {name}
-          </li>
-        ))}
-      </ul>
-    </div>
+    <BrowserRouter>
+      <nav className="p-4 border-b flex gap-4 text-sm">
+        <Link to="/" className="font-bold">股股記 Guguji</Link>
+        <Link to="/transactions">Transactions</Link>
+        <Link to="/split-events">Splits</Link>
+        <Link to="/alerts">Alerts</Link>
+        <Link to="/settings">Settings</Link>
+      </nav>
+      <main className="p-4">
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/transactions" element={<TransactionList />} />
+          <Route path="/transactions/new" element={<AddTransaction />} />
+          <Route path="/transactions/:id/edit" element={<AddTransaction />} />
+          <Route path="/stocks/:ticker" element={<StockDetail />} />
+          <Route path="/split-events" element={<SplitEvents />} />
+          <Route path="/alerts" element={<Alerts />} />
+          <Route path="/alert-history" element={<AlertHistory />} />
+          <Route path="/settings" element={<Settings />} />
+        </Routes>
+      </main>
+    </BrowserRouter>
   )
 }
