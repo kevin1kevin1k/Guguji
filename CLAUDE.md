@@ -12,6 +12,9 @@
 
 常用 type：`feat`、`fix`、`docs`、`style`、`refactor`、`test`、`chore`、`ci`、`perf`
 
+## Commit 粒度
+每個 commit 越小越好，專注單一職責。寧可多個小 commit，不要一個大 commit。
+
 ## 測試（寬鬆 TDD）
 - 所有程式變更都應有相對應的測試變更或增刪
 - 重複修改直到確認相對應的測試通過為止
