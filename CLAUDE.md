@@ -3,6 +3,10 @@
 ## 語言
 一律用繁體中文回應，即使提示使用英文或其他語言，除非特別要求。
 
+程式碼（包含註解）一律使用英文，除非：
+- UI 介面顯示的文字（如按鈕標籤、頁面標題）
+- 明確被允許使用中文的情況
+
 ## Commit 格式
 遵從 [Conventional Commits](https://www.conventionalcommits.org/) 規範：
 
