@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { TransactionRepository } from '../../db/TransactionRepository'
-import { transactionsToCSV, downloadCSV } from '../../utils/csv'
+import { transactionsToCSV, downloadCSV, parseTransactionsFromCSV } from '../../utils/csv'
 import type { Transaction, TransactionType } from '../../types'
 
 const TYPE_LABELS: Record<TransactionType, string> = {
@@ -22,6 +22,7 @@ export default function TransactionList() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [filterTicker, setFilterTicker] = useState('')
   const [filterType, setFilterType] = useState<TransactionType | ''>('')
+  const [importMsg, setImportMsg] = useState<string | null>(null)
 
   async function load() {
     const all = await TransactionRepository.getAll()
@@ -29,6 +30,30 @@ export default function TransactionList() {
   }
 
   useEffect(() => { load() }, [])
+
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+
+    const text = await file.text()
+    const existing = await TransactionRepository.getAll()
+    const existingKeys = new Set(
+      existing.map((tx) => `${tx.date}|${tx.ticker}|${tx.market}|${tx.type}|${tx.price}|${tx.shares}`),
+    )
+    const { transactions, result } = parseTransactionsFromCSV(text, existingKeys)
+
+    for (const tx of transactions) {
+      await TransactionRepository.add(tx)
+    }
+    await load()
+
+    const parts = [`匯入 ${result.imported} 筆`]
+    if (result.skipped > 0) parts.push(`略過 ${result.skipped} 筆`)
+    if (result.errors.length > 0) parts.push(`錯誤：${result.errors.slice(0, 3).join('；')}`)
+    setImportMsg(parts.join('，'))
+    setTimeout(() => setImportMsg(null), 5000)
+  }
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this transaction?')) return
@@ -47,6 +72,16 @@ export default function TransactionList() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold">Transactions</h2>
         <div className="flex gap-2">
+          <label className="px-3 py-1.5 text-sm rounded border hover:bg-gray-50 cursor-pointer">
+            Import CSV
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              className="sr-only"
+              aria-label="Import CSV"
+              onChange={handleImport}
+            />
+          </label>
           <button
             onClick={() => {
               const date = new Date().toISOString().slice(0, 10)
@@ -64,6 +99,12 @@ export default function TransactionList() {
           </Link>
         </div>
       </div>
+
+      {importMsg && (
+        <p className="mb-3 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2" role="status">
+          {importMsg}
+        </p>
+      )}
 
       {/* Filters */}
       <div className="flex gap-3 mb-4">
