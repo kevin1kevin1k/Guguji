@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
@@ -187,7 +188,14 @@ export default function Dashboard() {
               const hasPrice = pos.currentPrice > 0
               return (
                 <tr key={`${pos.ticker}:${pos.market}`} className="border-b hover:bg-gray-50">
-                  <td className="py-2 pr-4 font-medium">{pos.ticker}</td>
+                  <td className="py-2 pr-4 font-medium">
+                    <Link
+                      to={`/stocks/${pos.ticker}?market=${pos.market}`}
+                      className="hover:underline text-blue-700"
+                    >
+                      {pos.ticker}
+                    </Link>
+                  </td>
                   <td className="py-2 pr-4 text-gray-500">{pos.market}</td>
                   <td className="py-2 pr-4 text-right">{fmt(pos.shares, 4)}</td>
                   <td className="py-2 pr-4 text-right">{fmt(pos.avgCost)}</td>
