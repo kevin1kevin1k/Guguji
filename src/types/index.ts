@@ -54,6 +54,14 @@ export interface PriceCache {
   updatedAt: string
 }
 
+export interface PriceHistory {
+  key: string    // `${ticker}:${market}:${date}`
+  ticker: string
+  market: Market
+  date: string   // YYYY-MM-DD
+  open: number
+}
+
 /** 持倉計算結果 */
 export interface Position {
   ticker: string

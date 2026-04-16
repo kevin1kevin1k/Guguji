@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
-import type { Transaction, SplitEvent, Alert, AlertHistory, PriceCache } from '../types'
+import type { Transaction, SplitEvent, Alert, AlertHistory, PriceCache, PriceHistory } from '../types'
 
 interface GugujiDB extends DBSchema {
   transactions: {
@@ -26,31 +26,40 @@ interface GugujiDB extends DBSchema {
     key: string // `${ticker}:${market}`
     value: PriceCache
   }
+  price_history: {
+    key: string  // `${ticker}:${market}:${date}`
+    value: PriceHistory
+  }
 }
 
 const DB_NAME = 'guguji'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 let dbPromise: Promise<IDBPDatabase<GugujiDB>> | null = null
 
 export function getDB(): Promise<IDBPDatabase<GugujiDB>> {
   if (!dbPromise) {
     dbPromise = openDB<GugujiDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        const txStore = db.createObjectStore('transactions', { keyPath: 'id' })
-        txStore.createIndex('by-ticker', 'ticker')
-        txStore.createIndex('by-date', 'date')
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          const txStore = db.createObjectStore('transactions', { keyPath: 'id' })
+          txStore.createIndex('by-ticker', 'ticker')
+          txStore.createIndex('by-date', 'date')
 
-        const splitStore = db.createObjectStore('split_events', { keyPath: 'id' })
-        splitStore.createIndex('by-ticker', 'ticker')
+          const splitStore = db.createObjectStore('split_events', { keyPath: 'id' })
+          splitStore.createIndex('by-ticker', 'ticker')
 
-        const alertStore = db.createObjectStore('alerts', { keyPath: 'id' })
-        alertStore.createIndex('by-ticker', 'ticker')
+          const alertStore = db.createObjectStore('alerts', { keyPath: 'id' })
+          alertStore.createIndex('by-ticker', 'ticker')
 
-        const historyStore = db.createObjectStore('alert_history', { keyPath: 'id' })
-        historyStore.createIndex('by-ticker', 'ticker')
+          const histStore = db.createObjectStore('alert_history', { keyPath: 'id' })
+          histStore.createIndex('by-ticker', 'ticker')
 
-        db.createObjectStore('price_cache', { keyPath: 'ticker' })
+          db.createObjectStore('price_cache', { keyPath: 'ticker' })
+        }
+        if (oldVersion < 2) {
+          db.createObjectStore('price_history', { keyPath: 'key' })
+        }
       },
     })
   }
