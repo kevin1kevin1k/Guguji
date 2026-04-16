@@ -67,6 +67,40 @@ describe('calcPortfolioHistory', () => {
     expect(jun.value).toBeLessThan(jan.value)
     expect(jun.value).toBeCloseTo(5 * 120)
   })
+
+  it('uses historical price when available for the exact date', () => {
+    const txs = [tx({ shares: 10, date: '2024-01-01' })]
+    // Historical price 130 differs from current price 120
+    const histPrices = new Map([['0050:TW:2024-01-01', 130]])
+    const points = calcPortfolioHistory(txs, [], prices, histPrices)
+    const jan = points.find((p) => p.date === '2024-01-01')!
+    expect(jan.value).toBeCloseTo(10 * 130)
+  })
+
+  it('falls back to nearest prior day when date is a gap (e.g. weekend)', () => {
+    const txs = [tx({ shares: 10, date: '2024-01-01' })]
+    // Price available on Dec 31, not Jan 1 (simulates holiday gap)
+    const histPrices = new Map([['0050:TW:2023-12-31', 125]])
+    const points = calcPortfolioHistory(txs, [], prices, histPrices)
+    const jan = points.find((p) => p.date === '2024-01-01')!
+    expect(jan.value).toBeCloseTo(10 * 125)
+  })
+
+  it('falls back to currentPrices when no historical data within 7 days', () => {
+    const txs = [tx({ shares: 10, date: '2024-01-01' })]
+    // Price is 8 days old — beyond the 7-day fallback window
+    const histPrices = new Map([['0050:TW:2023-12-24', 110]])
+    const points = calcPortfolioHistory(txs, [], prices, histPrices)
+    const jan = points.find((p) => p.date === '2024-01-01')!
+    expect(jan.value).toBeCloseTo(10 * 120) // falls back to currentPrices
+  })
+
+  it('behaves identically when historicalPrices is undefined', () => {
+    const txs = [tx({ shares: 10, date: '2024-01-01' })]
+    const without = calcPortfolioHistory(txs, [], prices)
+    const withUndef = calcPortfolioHistory(txs, [], prices, undefined)
+    expect(without).toEqual(withUndef)
+  })
 })
 
 describe('filterByRange', () => {

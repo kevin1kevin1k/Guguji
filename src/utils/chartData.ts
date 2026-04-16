@@ -7,30 +7,47 @@ export interface ChartPoint {
 }
 
 /**
- * Calculates portfolio value history using current prices (Phase 1 estimation).
+ * Finds the most recent historical price within maxDaysBack days of `date`.
+ * Returns undefined if no price found within the window.
+ */
+function findHistoricalPrice(
+  historicalPrices: Map<string, number>,
+  tickerMarketKey: string, // `${ticker}:${market}`
+  date: string,
+  maxDaysBack = 7,
+): number | undefined {
+  for (let i = 0; i <= maxDaysBack; i++) {
+    const d = new Date(date + 'T00:00:00Z')
+    d.setUTCDate(d.getUTCDate() - i)
+    const price = historicalPrices.get(`${tickerMarketKey}:${d.toISOString().slice(0, 10)}`)
+    if (price !== undefined && price > 0) return price
+  }
+  return undefined
+}
+
+/**
+ * Calculates portfolio value history.
  *
- * For each unique transaction date (plus today), we replay all transactions
- * up to that date to get the shares held, then multiply by the current price.
- * This shows how the portfolio composition changed over time at today's prices.
+ * When historicalPrices is provided, uses actual open prices per date
+ * (falling back up to 7 days back for weekends/holidays, then to currentPrices).
+ * Without historicalPrices, uses currentPrices for all dates (Phase 1 estimation).
  */
 export function calcPortfolioHistory(
   transactions: Transaction[],
   splitEvents: SplitEvent[],
-  prices: Record<string, number>, // `${ticker}:${market}` -> current price
+  prices: Record<string, number>,           // `${ticker}:${market}` -> current price
+  historicalPrices?: Map<string, number>,   // `${ticker}:${market}:${date}` -> open price
 ): ChartPoint[] {
   if (transactions.length === 0) return []
 
   const sorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date))
 
-  // Collect unique dates (transaction dates + today)
   const today = new Date().toISOString().slice(0, 10)
   const dates = [...new Set([...sorted.map((t) => t.date), today])].sort()
 
   return dates.map((date) => {
-    // Replay transactions up to this date
     const txsUpTo = sorted.filter((t) => t.date <= date)
 
-    // Group by ticker:market
     const sharesMap = new Map<string, number>()
 
     for (const tx of txsUpTo) {
@@ -48,11 +65,13 @@ export function calcPortfolioHistory(
       }
     }
 
-    // Sum value using current prices
     let value = 0
     for (const [key, shares] of sharesMap) {
       if (shares > 0.00001) {
-        value += shares * (prices[key] ?? 0)
+        const price = historicalPrices
+          ? (findHistoricalPrice(historicalPrices, key, date) ?? (prices[key] ?? 0))
+          : (prices[key] ?? 0)
+        value += shares * price
       }
     }
 
