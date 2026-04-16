@@ -5,6 +5,8 @@ import Dashboard from './index'
 import { TransactionRepository } from '../../db/TransactionRepository'
 import { SplitEventRepository } from '../../db/SplitEventRepository'
 import { PriceCacheRepository } from '../../db/PriceCacheRepository'
+import { PriceHistoryRepository } from '../../db/PriceHistoryRepository'
+import { refreshPriceHistory } from '../../utils/priceHistory'
 import type { Transaction, PriceCache } from '../../types'
 
 vi.mock('../../db/TransactionRepository', () => ({
@@ -15,6 +17,12 @@ vi.mock('../../db/SplitEventRepository', () => ({
 }))
 vi.mock('../../db/PriceCacheRepository', () => ({
   PriceCacheRepository: { getAll: vi.fn() },
+}))
+vi.mock('../../db/PriceHistoryRepository', () => ({
+  PriceHistoryRepository: { getAll: vi.fn() },
+}))
+vi.mock('../../utils/priceHistory', () => ({
+  refreshPriceHistory: vi.fn(),
 }))
 
 const mockTxs: Transaction[] = [
@@ -50,6 +58,8 @@ beforeEach(() => {
   vi.mocked(TransactionRepository.getAll).mockResolvedValue(mockTxs)
   vi.mocked(SplitEventRepository.getAll).mockResolvedValue([])
   vi.mocked(PriceCacheRepository.getAll).mockResolvedValue(mockCaches)
+  vi.mocked(PriceHistoryRepository.getAll).mockResolvedValue([])
+  vi.mocked(refreshPriceHistory).mockResolvedValue({ success: [], failed: [] })
 })
 
 describe('Dashboard', () => {
@@ -96,5 +106,11 @@ describe('Dashboard', () => {
     renderDashboard()
     await screen.findByText('AAPL')
     expect(screen.getByText('USD 900')).toBeInTheDocument()
+  })
+
+  it('shows Refresh Prices button in chart section', async () => {
+    renderDashboard()
+    await screen.findByText('0050')
+    expect(screen.getByRole('button', { name: /refresh prices/i })).toBeInTheDocument()
   })
 })

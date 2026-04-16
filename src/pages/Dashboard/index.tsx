@@ -6,8 +6,10 @@ import {
 import { TransactionRepository } from '../../db/TransactionRepository'
 import { SplitEventRepository } from '../../db/SplitEventRepository'
 import { PriceCacheRepository } from '../../db/PriceCacheRepository'
+import { PriceHistoryRepository } from '../../db/PriceHistoryRepository'
 import { calcPositions } from '../../utils/position'
 import { calcPortfolioHistory, filterByRange, type ChartPoint } from '../../utils/chartData'
+import { refreshPriceHistory } from '../../utils/priceHistory'
 import type { Position, Transaction, SplitEvent } from '../../types'
 
 function fmt(n: number, decimals = 2): string {
@@ -29,23 +31,50 @@ export default function Dashboard() {
   const [chartPoints, setChartPoints] = useState<ChartPoint[]>([])
   const [range, setRange] = useState<Range>('1Y')
   const [tab, setTab] = useState<Tab>('open')
+  const [hasHistory, setHasHistory] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [refreshMsg, setRefreshMsg] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function load() {
-      const [txs, splits, caches] = await Promise.all([
-        TransactionRepository.getAll() as Promise<Transaction[]>,
-        SplitEventRepository.getAll() as Promise<SplitEvent[]>,
-        PriceCacheRepository.getAll(),
-      ])
-      const prices: Record<string, number> = {}
-      for (const c of caches) {
-        prices[`${c.ticker}:${c.market}`] = c.price
-      }
-      setPositions(calcPositions(txs, splits, prices))
-      setChartPoints(calcPortfolioHistory(txs, splits, prices))
+  async function load() {
+    const [txs, splits, caches, histEntries] = await Promise.all([
+      TransactionRepository.getAll() as Promise<Transaction[]>,
+      SplitEventRepository.getAll() as Promise<SplitEvent[]>,
+      PriceCacheRepository.getAll(),
+      PriceHistoryRepository.getAll(),
+    ])
+
+    const prices: Record<string, number> = {}
+    for (const c of caches) {
+      prices[`${c.ticker}:${c.market}`] = c.price
     }
-    load()
-  }, [])
+
+    const histMap = new Map<string, number>()
+    for (const h of histEntries) {
+      histMap.set(h.key, h.open)
+    }
+
+    setHasHistory(histMap.size > 0)
+    setPositions(calcPositions(txs, splits, prices))
+    setChartPoints(calcPortfolioHistory(txs, splits, prices, histMap.size > 0 ? histMap : undefined))
+  }
+
+  useEffect(() => { load() }, [])
+
+  async function handleRefresh() {
+    setRefreshing(true)
+    const openTickers = positions
+      .filter((p) => p.isOpen)
+      .map((p) => ({ ticker: p.ticker, market: p.market }))
+    const { failed } = await refreshPriceHistory(openTickers)
+    await load()
+    setRefreshing(false)
+    setLastUpdated(new Date())
+    if (failed.length > 0) {
+      setRefreshMsg(`更新失敗：${failed.join('、')}`)
+      setTimeout(() => setRefreshMsg(null), 5000)
+    }
+  }
 
   const visible = positions.filter((p) => (tab === 'open' ? p.isOpen : !p.isOpen))
   const twTotal = positions.filter((p) => p.isOpen && p.market === 'TW')
@@ -87,23 +116,43 @@ export default function Dashboard() {
       {chartPoints.length > 0 && (
         <div className="border rounded-lg p-4 mb-6">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium text-gray-700">Portfolio Value (estimated at current prices)</p>
-            <div className="flex gap-1">
-              {RANGES.map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setRange(r)}
-                  className={`px-2 py-0.5 text-xs rounded ${
-                    range === r
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-500 hover:bg-gray-100'
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
+            <p className="text-sm font-medium text-gray-700">
+              Portfolio Value
+              {hasHistory ? ' (historical prices)' : ' (estimated at current prices)'}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="px-2 py-0.5 text-xs rounded border text-gray-500 hover:bg-gray-100 disabled:opacity-50"
+              >
+                {refreshing ? 'Refreshing…' : 'Refresh Prices'}
+              </button>
+              {lastUpdated && (
+                <span className="text-xs text-gray-400">
+                  Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+              <div className="flex gap-1">
+                {RANGES.map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => setRange(r)}
+                    className={`px-2 py-0.5 text-xs rounded ${
+                      range === r
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-500 hover:bg-gray-100'
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
+          {refreshMsg && (
+            <p className="text-xs text-red-600 mb-2" role="status">{refreshMsg}</p>
+          )}
           {filteredPoints.length < 2 ? (
             <p className="text-sm text-gray-400 text-center py-8">Not enough data for this range.</p>
           ) : (
