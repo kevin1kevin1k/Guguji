@@ -15,7 +15,7 @@ const mockResponse = {
 describe('parseYahooResponse', () => {
   it('converts timestamps to YYYY-MM-DD dates', () => {
     const result = parseYahooResponse(mockResponse, 'AAPL', 'US')
-    expect(result[0].date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(result[0].date).toBe('2024-01-02')
   })
 
   it('skips entries where open is null', () => {
@@ -49,5 +49,19 @@ describe('parseYahooResponse', () => {
     const result = parseYahooResponse(mockResponse, '0050', 'TW')
     expect(result[0].ticker).toBe('0050')
     expect(result[0].key.startsWith('0050:TW:')).toBe(true)
+  })
+
+  it('skips entries when opens array is shorter than timestamps', () => {
+    const partial = {
+      chart: {
+        result: [{
+          timestamp: [1704153600, 1704240000, 1704326400],
+          indicators: { quote: [{ open: [185.0] }] }, // only 1 open for 3 timestamps
+        }],
+      },
+    }
+    const result = parseYahooResponse(partial, 'AAPL', 'US')
+    expect(result).toHaveLength(1)
+    expect(result[0].open).toBe(185.0)
   })
 })
