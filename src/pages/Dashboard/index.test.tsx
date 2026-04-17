@@ -133,4 +133,14 @@ describe('Dashboard', () => {
     await screen.findByText('0050')
     expect(screen.getByText('Total (TWD)')).toBeInTheDocument()
   })
+
+  it('shows computed Total (TWD) when exchange rate is set', async () => {
+    // twTotal = 0050: 10 × 120 = 1,200 TWD
+    // usTotal = AAPL: 5 × 180 = 900 USD
+    // totalTwd = 1200 + 900 × 30 = 28,200
+    vi.mocked(ExchangeRateRepository.getUsdTwd).mockResolvedValue(30)
+    renderDashboard()
+    await screen.findByText('0050')
+    await waitFor(() => expect(screen.getByText('TWD 28,200')).toBeInTheDocument())
+  })
 })
