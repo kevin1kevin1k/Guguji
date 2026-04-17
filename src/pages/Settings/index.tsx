@@ -1,16 +1,29 @@
 import { useEffect, useState } from 'react'
 import { ExchangeRateRepository } from '../../db/ExchangeRateRepository'
 import { fetchUsdTwd } from '../../utils/exchangeRate'
+import { requestNotificationPermission } from '../../utils/notification'
 import type { ExchangeRate } from '../../types'
 
 export default function Settings() {
   const [entry, setEntry] = useState<ExchangeRate | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default')
 
   useEffect(() => {
     ExchangeRateRepository.getEntry().then(setEntry)
   }, [])
+
+  useEffect(() => {
+    if ('Notification' in window) {
+      setNotifPermission(Notification.permission)
+    }
+  }, [])
+
+  async function handleRequestPermission() {
+    const permission = await requestNotificationPermission()
+    setNotifPermission(permission)
+  }
 
   async function handleRefresh() {
     setLoading(true)
@@ -57,6 +70,20 @@ export default function Settings() {
         {error && (
           <p className="text-xs text-red-600 mt-2" role="alert">{error}</p>
         )}
+      </div>
+
+      <div className="border rounded-lg p-4 max-w-sm mt-4">
+        <h3 className="text-sm font-medium text-gray-700 mb-3">通知</h3>
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">
+            瀏覽器通知：{notifPermission === 'granted' ? '已啟用' : notifPermission === 'denied' ? '已封鎖' : '未設定'}
+          </span>
+          {notifPermission !== 'granted' && notifPermission !== 'denied' && (
+            <button onClick={handleRequestPermission} className="px-3 py-1 text-xs rounded border hover:bg-gray-100">
+              啟用通知
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
