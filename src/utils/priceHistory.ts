@@ -2,10 +2,21 @@ import type { PriceHistory, Market } from '../types'
 import { PriceHistoryRepository } from '../db/PriceHistoryRepository'
 
 const YAHOO_BASE = 'https://query1.finance.yahoo.com/v8/finance/chart'
-const CORS_PROXY = 'https://api.allorigins.win/raw?url='
+
+// Free CORS proxies tried in order; direct call attempted first
+const CORS_PROXIES = [
+  (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+]
 
 function yahooSymbol(ticker: string, market: Market): string {
   return market === 'TW' ? `${ticker}.TW` : ticker
+}
+
+async function fetchJson(url: string): Promise<unknown> {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,17 +41,21 @@ export async function fetchYahooHistory(
   ticker: string,
   market: Market,
 ): Promise<PriceHistory[]> {
-  try {
-    const symbol = yahooSymbol(ticker, market)
-    const yahooUrl = `${YAHOO_BASE}/${symbol}?interval=1d&range=5y`
-    const url = `${CORS_PROXY}${encodeURIComponent(yahooUrl)}`
-    const res = await fetch(url)
-    if (!res.ok) return []
-    const data = await res.json()
-    return parseYahooResponse(data, ticker, market)
-  } catch {
-    return []
+  const symbol = yahooSymbol(ticker, market)
+  const yahooUrl = `${YAHOO_BASE}/${symbol}?interval=1d&range=5y`
+
+  // Try direct, then each proxy in order
+  const candidates = [yahooUrl, ...CORS_PROXIES.map((p) => p(yahooUrl))]
+  for (const url of candidates) {
+    try {
+      const data = await fetchJson(url)
+      const entries = parseYahooResponse(data, ticker, market)
+      if (entries.length > 0) return entries
+    } catch {
+      // try next
+    }
   }
+  return []
 }
 
 export async function refreshPriceHistory(
