@@ -16,11 +16,15 @@ export default function AlertHistoryPage() {
   const [history, setHistory] = useState<AlertHistory[]>([])
 
   const load = useCallback(async () => {
-    const all = await AlertRepository.getAllHistory()
-    const sorted = [...all].sort((a, b) =>
-      new Date(b.triggeredAt).getTime() - new Date(a.triggeredAt).getTime()
-    )
-    setHistory(sorted)
+    try {
+      const all = await AlertRepository.getAllHistory()
+      const sorted = [...all].sort((a, b) =>
+        new Date(b.triggeredAt).getTime() - new Date(a.triggeredAt).getTime()
+      )
+      setHistory(sorted)
+    } catch (err) {
+      console.error('Failed to load alert history', err)
+    }
   }, [])
 
   useEffect(() => {
