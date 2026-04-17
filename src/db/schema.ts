@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
-import type { Transaction, SplitEvent, Alert, AlertHistory, PriceCache, PriceHistory } from '../types'
+import type { Transaction, SplitEvent, Alert, AlertHistory, PriceCache, PriceHistory, ExchangeRate } from '../types'
 
 interface GugujiDB extends DBSchema {
   transactions: {
@@ -30,10 +30,14 @@ interface GugujiDB extends DBSchema {
     key: string  // `${ticker}:${market}:${date}`
     value: PriceHistory
   }
+  exchange_rates: {
+    key: string
+    value: ExchangeRate
+  }
 }
 
 const DB_NAME = 'guguji'
-const DB_VERSION = 2
+const DB_VERSION = 3
 
 let dbPromise: Promise<IDBPDatabase<GugujiDB>> | null = null
 
@@ -59,6 +63,9 @@ export function getDB(): Promise<IDBPDatabase<GugujiDB>> {
         }
         if (oldVersion < 2) {
           db.createObjectStore('price_history', { keyPath: 'key' })
+        }
+        if (oldVersion < 3) {
+          db.createObjectStore('exchange_rates', { keyPath: 'key' })
         }
       },
     })

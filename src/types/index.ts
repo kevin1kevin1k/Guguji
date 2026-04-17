@@ -62,6 +62,14 @@ export interface PriceHistory {
   open: number
 }
 
+export interface ExchangeRate {
+  key: 'USD:TWD'
+  from: 'USD'
+  to: 'TWD'
+  rate: number
+  updatedAt: string  // ISO 8601
+}
+
 /** 持倉計算結果 */
 export interface Position {
   ticker: string
