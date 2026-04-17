@@ -11,6 +11,10 @@ import { ExchangeRateRepository } from '../../db/ExchangeRateRepository'
 import { calcPositions } from '../../utils/position'
 import { calcPortfolioHistory, filterByRange, type ChartPoint } from '../../utils/chartData'
 import { refreshPriceHistory } from '../../utils/priceHistory'
+import { AlertRepository } from '../../db/AlertRepository'
+import { checkAlerts, getLatestPrices } from '../../utils/alertCheck'
+import { showAlertNotification } from '../../utils/notification'
+import { generateId } from '../../utils/id'
 import type { Position, Transaction, SplitEvent } from '../../types'
 
 function fmt(n: number, decimals = 2): string {
@@ -69,17 +73,44 @@ export default function Dashboard() {
 
   async function handleRefresh() {
     setRefreshing(true)
-    const freshPositions = await load()
-    const openTickers = freshPositions
-      .filter((p) => p.isOpen)
-      .map((p) => ({ ticker: p.ticker, market: p.market }))
-    const { failed } = await refreshPriceHistory(openTickers)
-    await load()
-    setRefreshing(false)
-    setLastUpdated(new Date())
-    if (failed.length > 0) {
-      setRefreshMsg(`更新失敗：${failed.join('、')}`)
-      setTimeout(() => setRefreshMsg(null), 5000)
+    try {
+      const freshPositions = await load()
+      const openTickers = freshPositions
+        .filter((p) => p.isOpen)
+        .map((p) => ({ ticker: p.ticker, market: p.market }))
+      const { failed } = await refreshPriceHistory(openTickers)
+      await load()
+
+      // Alert check using newly fetched price history
+      const [histEntries, activeAlerts] = await Promise.all([
+        PriceHistoryRepository.getAll(),
+        AlertRepository.getAll(),
+      ])
+      const latestPrices = getLatestPrices(histEntries)
+      const triggers = checkAlerts(latestPrices, activeAlerts)
+      for (const { alert, triggerType, triggerPrice } of triggers) {
+        const threshold = triggerType === 'stop_loss' ? alert.stopLossPrice! : alert.takeProfitPrice!
+        await AlertRepository.addHistory({
+          id: generateId(),
+          alertId: alert.id,
+          ticker: alert.ticker,
+          triggerType,
+          triggerPrice,
+          triggeredAt: new Date().toISOString(),
+        })
+        if (!alert.repeat) {
+          await AlertRepository.upsert({ ...alert, isActive: false })
+        }
+        await showAlertNotification(triggerType, alert.ticker, alert.market, triggerPrice, threshold)
+      }
+
+      setLastUpdated(new Date())
+      if (failed.length > 0) {
+        setRefreshMsg(`更新失敗：${failed.join('、')}`)
+        setTimeout(() => setRefreshMsg(null), 5000)
+      }
+    } finally {
+      setRefreshing(false)
     }
   }
 

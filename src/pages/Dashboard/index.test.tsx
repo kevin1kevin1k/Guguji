@@ -8,6 +8,9 @@ import { PriceCacheRepository } from '../../db/PriceCacheRepository'
 import { PriceHistoryRepository } from '../../db/PriceHistoryRepository'
 import { refreshPriceHistory } from '../../utils/priceHistory'
 import { ExchangeRateRepository } from '../../db/ExchangeRateRepository'
+import { AlertRepository } from '../../db/AlertRepository'
+import { getLatestPrices, checkAlerts } from '../../utils/alertCheck'
+import { showAlertNotification } from '../../utils/notification'
 import type { Transaction, PriceCache } from '../../types'
 
 vi.mock('../../db/TransactionRepository', () => ({
@@ -27,6 +30,16 @@ vi.mock('../../utils/priceHistory', () => ({
 }))
 vi.mock('../../db/ExchangeRateRepository', () => ({
   ExchangeRateRepository: { getUsdTwd: vi.fn() },
+}))
+vi.mock('../../db/AlertRepository', () => ({
+  AlertRepository: { getAll: vi.fn(), upsert: vi.fn(), addHistory: vi.fn() },
+}))
+vi.mock('../../utils/alertCheck', () => ({
+  getLatestPrices: vi.fn().mockReturnValue({}),
+  checkAlerts: vi.fn().mockReturnValue([]),
+}))
+vi.mock('../../utils/notification', () => ({
+  showAlertNotification: vi.fn(),
 }))
 
 const mockTxs: Transaction[] = [
@@ -65,6 +78,9 @@ beforeEach(() => {
   vi.mocked(PriceHistoryRepository.getAll).mockResolvedValue([])
   vi.mocked(refreshPriceHistory).mockResolvedValue({ success: [], failed: [] })
   vi.mocked(ExchangeRateRepository.getUsdTwd).mockResolvedValue(null)
+  vi.mocked(AlertRepository.getAll).mockResolvedValue([])
+  vi.mocked(AlertRepository.addHistory).mockResolvedValue(undefined)
+  vi.mocked(AlertRepository.upsert).mockResolvedValue(undefined)
 })
 
 describe('Dashboard', () => {
@@ -127,6 +143,17 @@ describe('Dashboard', () => {
     const btn = screen.getByRole('button', { name: /refresh prices/i })
     fireEvent.click(btn)
     await waitFor(() => expect(vi.mocked(refreshPriceHistory)).toHaveBeenCalledTimes(1))
+  })
+
+  it('checks alerts after refreshing prices', async () => {
+    renderDashboard()
+    await screen.findByText('0050')
+    const btn = screen.getByRole('button', { name: /refresh prices/i })
+    fireEvent.click(btn)
+    await waitFor(() => expect(vi.mocked(AlertRepository.getAll)).toHaveBeenCalled())
+    expect(vi.mocked(getLatestPrices)).toHaveBeenCalled()
+    expect(vi.mocked(checkAlerts)).toHaveBeenCalled()
+    expect(vi.mocked(showAlertNotification)).not.toHaveBeenCalled()
   })
 
   it('shows Total (TWD) card with — when no exchange rate', async () => {
