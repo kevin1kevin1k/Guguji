@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -36,7 +36,7 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [refreshMsg, setRefreshMsg] = useState<string | null>(null)
 
-  async function load() {
+  const load = useCallback(async (): Promise<Position[]> => {
     const [txs, splits, caches, histEntries] = await Promise.all([
       TransactionRepository.getAll() as Promise<Transaction[]>,
       SplitEventRepository.getAll() as Promise<SplitEvent[]>,
@@ -54,16 +54,19 @@ export default function Dashboard() {
       histMap.set(h.key, h.open)
     }
 
-    setHasHistory(histMap.size > 0)
-    setPositions(calcPositions(txs, splits, prices))
+    const computed = calcPositions(txs, splits, prices)
+    setPositions(computed)
     setChartPoints(calcPortfolioHistory(txs, splits, prices, histMap.size > 0 ? histMap : undefined))
-  }
+    setHasHistory(histMap.size > 0)
+    return computed
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   async function handleRefresh() {
     setRefreshing(true)
-    const openTickers = positions
+    const freshPositions = await load()
+    const openTickers = freshPositions
       .filter((p) => p.isOpen)
       .map((p) => ({ ticker: p.ticker, market: p.market }))
     const { failed } = await refreshPriceHistory(openTickers)

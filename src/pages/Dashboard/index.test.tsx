@@ -113,4 +113,12 @@ describe('Dashboard', () => {
     await screen.findByText('0050')
     expect(screen.getByRole('button', { name: /refresh prices/i })).toBeInTheDocument()
   })
+
+  it('calls refreshPriceHistory when Refresh Prices button is clicked', async () => {
+    renderDashboard()
+    await screen.findByText('0050')
+    const btn = screen.getByRole('button', { name: /refresh prices/i })
+    fireEvent.click(btn)
+    await waitFor(() => expect(vi.mocked(refreshPriceHistory)).toHaveBeenCalledTimes(1))
+  })
 })
