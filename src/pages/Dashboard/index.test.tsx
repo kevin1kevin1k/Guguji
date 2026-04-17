@@ -7,6 +7,7 @@ import { SplitEventRepository } from '../../db/SplitEventRepository'
 import { PriceCacheRepository } from '../../db/PriceCacheRepository'
 import { PriceHistoryRepository } from '../../db/PriceHistoryRepository'
 import { refreshPriceHistory } from '../../utils/priceHistory'
+import { ExchangeRateRepository } from '../../db/ExchangeRateRepository'
 import type { Transaction, PriceCache } from '../../types'
 
 vi.mock('../../db/TransactionRepository', () => ({
@@ -23,6 +24,9 @@ vi.mock('../../db/PriceHistoryRepository', () => ({
 }))
 vi.mock('../../utils/priceHistory', () => ({
   refreshPriceHistory: vi.fn(),
+}))
+vi.mock('../../db/ExchangeRateRepository', () => ({
+  ExchangeRateRepository: { getUsdTwd: vi.fn() },
 }))
 
 const mockTxs: Transaction[] = [
@@ -60,6 +64,7 @@ beforeEach(() => {
   vi.mocked(PriceCacheRepository.getAll).mockResolvedValue(mockCaches)
   vi.mocked(PriceHistoryRepository.getAll).mockResolvedValue([])
   vi.mocked(refreshPriceHistory).mockResolvedValue({ success: [], failed: [] })
+  vi.mocked(ExchangeRateRepository.getUsdTwd).mockResolvedValue(null)
 })
 
 describe('Dashboard', () => {
@@ -120,5 +125,12 @@ describe('Dashboard', () => {
     const btn = screen.getByRole('button', { name: /refresh prices/i })
     fireEvent.click(btn)
     await waitFor(() => expect(vi.mocked(refreshPriceHistory)).toHaveBeenCalledTimes(1))
+  })
+
+  it('shows Total (TWD) card with — when no exchange rate', async () => {
+    vi.mocked(ExchangeRateRepository.getUsdTwd).mockResolvedValue(null)
+    renderDashboard()
+    await screen.findByText('0050')
+    expect(screen.getByText('Total (TWD)')).toBeInTheDocument()
   })
 })

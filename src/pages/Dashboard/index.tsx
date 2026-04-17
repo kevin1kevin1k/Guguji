@@ -7,6 +7,7 @@ import { TransactionRepository } from '../../db/TransactionRepository'
 import { SplitEventRepository } from '../../db/SplitEventRepository'
 import { PriceCacheRepository } from '../../db/PriceCacheRepository'
 import { PriceHistoryRepository } from '../../db/PriceHistoryRepository'
+import { ExchangeRateRepository } from '../../db/ExchangeRateRepository'
 import { calcPositions } from '../../utils/position'
 import { calcPortfolioHistory, filterByRange, type ChartPoint } from '../../utils/chartData'
 import { refreshPriceHistory } from '../../utils/priceHistory'
@@ -35,13 +36,15 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [refreshMsg, setRefreshMsg] = useState<string | null>(null)
+  const [usdTwdRate, setUsdTwdRate] = useState<number | null>(null)
 
   const load = useCallback(async (): Promise<Position[]> => {
-    const [txs, splits, caches, histEntries] = await Promise.all([
+    const [txs, splits, caches, histEntries, usdTwd] = await Promise.all([
       TransactionRepository.getAll() as Promise<Transaction[]>,
       SplitEventRepository.getAll() as Promise<SplitEvent[]>,
       PriceCacheRepository.getAll(),
       PriceHistoryRepository.getAll(),
+      ExchangeRateRepository.getUsdTwd(),
     ])
 
     const prices: Record<string, number> = {}
@@ -58,6 +61,7 @@ export default function Dashboard() {
     setPositions(computed)
     setChartPoints(calcPortfolioHistory(txs, splits, prices, histMap.size > 0 ? histMap : undefined))
     setHasHistory(histMap.size > 0)
+    setUsdTwdRate(usdTwd)
     return computed
   }, [])
 
@@ -88,13 +92,14 @@ export default function Dashboard() {
     .reduce((s, p) => s + p.unrealizedPnl, 0)
 
   const filteredPoints = filterByRange(chartPoints, range)
+  const totalTwd = usdTwdRate !== null ? twTotal + usTotal * usdTwdRate : null
 
   return (
     <div>
       <h2 className="text-xl font-semibold mb-4">Dashboard</h2>
 
       {/* Total assets card */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
         <div className="border rounded-lg p-4">
           <p className="text-xs text-gray-500 mb-1">TW Market Value</p>
           <p className="text-lg font-semibold">TWD {fmt(twTotal, 0)}</p>
@@ -111,6 +116,12 @@ export default function Dashboard() {
           <p className="text-xs text-gray-500 mb-1">Unrealized P&amp;L</p>
           <p className={`text-lg font-semibold ${pnlColor(totalPnl)}`}>
             {totalPnl >= 0 ? '+' : ''}{fmt(totalPnl, 0)}
+          </p>
+        </div>
+        <div className="border rounded-lg p-4 col-span-2 md:col-span-1">
+          <p className="text-xs text-gray-500 mb-1">Total (TWD)</p>
+          <p className="text-lg font-semibold">
+            {totalTwd !== null ? `TWD ${fmt(totalTwd, 0)}` : '—'}
           </p>
         </div>
       </div>
