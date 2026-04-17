@@ -21,8 +21,12 @@ export default function Settings() {
   }, [])
 
   async function handleRequestPermission() {
-    const permission = await requestNotificationPermission()
-    setNotifPermission(permission)
+    try {
+      const permission = await requestNotificationPermission()
+      setNotifPermission(permission)
+    } catch {
+      // requestPermission() can reject in some environments; silently ignore
+    }
   }
 
   async function handleRefresh() {
