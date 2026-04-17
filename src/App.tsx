@@ -16,6 +16,7 @@ export default function App() {
         <Link to="/transactions">Transactions</Link>
         <Link to="/split-events">Splits</Link>
         <Link to="/alerts">Alerts</Link>
+        <Link to="/alert-history">Alert History</Link>
         <Link to="/settings">Settings</Link>
       </nav>
       <main className="p-4">
