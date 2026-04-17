@@ -172,7 +172,9 @@ export default function AddTransaction() {
         <div className="flex gap-3">
           <div className="flex-1">
             <label htmlFor="price" className="block text-sm font-medium mb-1">
-              {type === 'dividend' ? 'Amount per share' : 'Price'}
+              {type === 'dividend'
+                ? `Amount per share (${market === 'TW' ? 'TWD' : 'USD'})`
+                : `Price (${market === 'TW' ? 'TWD' : 'USD'})`}
             </label>
             <input
               id="price"
@@ -202,7 +204,9 @@ export default function AddTransaction() {
 
         {(type === 'buy' || type === 'sell') && (
           <div>
-            <label htmlFor="fee" className="block text-sm font-medium mb-1">Fee (optional)</label>
+            <label htmlFor="fee" className="block text-sm font-medium mb-1">
+            Fee (optional, {market === 'TW' ? 'TWD' : 'USD'})
+          </label>
             <input
               id="fee"
               type="number"

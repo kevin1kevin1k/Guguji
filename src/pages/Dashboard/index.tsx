@@ -88,8 +88,11 @@ export default function Dashboard() {
     .reduce((s, p) => s + p.currentValue, 0)
   const usTotal = positions.filter((p) => p.isOpen && p.market === 'US')
     .reduce((s, p) => s + p.currentValue, 0)
-  const totalPnl = positions.filter((p) => p.isOpen)
+  const twPnl = positions.filter((p) => p.isOpen && p.market === 'TW')
     .reduce((s, p) => s + p.unrealizedPnl, 0)
+  const usPnl = positions.filter((p) => p.isOpen && p.market === 'US')
+    .reduce((s, p) => s + p.unrealizedPnl, 0)
+  const totalPnlTwd = usdTwdRate !== null ? twPnl + usPnl * usdTwdRate : null
 
   const filteredPoints = filterByRange(chartPoints, range)
   const totalTwd = usdTwdRate !== null ? twTotal + usTotal * usdTwdRate : null
@@ -114,9 +117,20 @@ export default function Dashboard() {
         </div>
         <div className="border rounded-lg p-4">
           <p className="text-xs text-gray-500 mb-1">Unrealized P&amp;L</p>
-          <p className={`text-lg font-semibold ${pnlColor(totalPnl)}`}>
-            {totalPnl >= 0 ? '+' : ''}{fmt(totalPnl, 0)}
-          </p>
+          {totalPnlTwd !== null ? (
+            <p className={`text-lg font-semibold ${pnlColor(totalPnlTwd)}`}>
+              {totalPnlTwd >= 0 ? '+' : '-'}TWD {fmt(Math.abs(totalPnlTwd), 0)}
+            </p>
+          ) : (
+            <div className="space-y-0.5">
+              <p className={`text-sm font-semibold ${pnlColor(twPnl)}`}>
+                {twPnl >= 0 ? '+' : '-'}TWD {fmt(Math.abs(twPnl), 0)}
+              </p>
+              <p className={`text-sm font-semibold ${pnlColor(usPnl)}`}>
+                {usPnl >= 0 ? '+' : '-'}USD {fmt(Math.abs(usPnl), 0)}
+              </p>
+            </div>
+          )}
         </div>
         <div className="border rounded-lg p-4 col-span-2 md:col-span-1">
           <p className="text-xs text-gray-500 mb-1">Total (TWD)</p>
@@ -263,9 +277,13 @@ export default function Dashboard() {
                   <td className="py-2 pr-4 text-right">{fmt(pos.shares, 4)}</td>
                   <td className="py-2 pr-4 text-right">{fmt(pos.avgCost)}</td>
                   <td className="py-2 pr-4 text-right">{hasPrice ? fmt(pos.currentPrice) : '—'}</td>
-                  <td className="py-2 pr-4 text-right">{hasPrice ? fmt(pos.currentValue, 0) : '—'}</td>
+                  <td className="py-2 pr-4 text-right">
+                    {hasPrice ? `${pos.market === 'TW' ? 'TWD' : 'USD'} ${fmt(pos.currentValue, 0)}` : '—'}
+                  </td>
                   <td className={`py-2 pr-4 text-right ${hasPrice ? pnlColor(pos.unrealizedPnl) : 'text-gray-400'}`}>
-                    {hasPrice ? `${pos.unrealizedPnl >= 0 ? '+' : ''}${fmt(pos.unrealizedPnl, 0)}` : '—'}
+                    {hasPrice
+                      ? `${pos.unrealizedPnl >= 0 ? '+' : '-'}${pos.market === 'TW' ? 'TWD' : 'USD'} ${fmt(Math.abs(pos.unrealizedPnl), 0)}`
+                      : '—'}
                   </td>
                   <td className={`py-2 text-right ${hasPrice ? pnlColor(pos.unrealizedPnlPct) : 'text-gray-400'}`}>
                     {hasPrice ? `${pos.unrealizedPnlPct >= 0 ? '+' : ''}${fmt(pos.unrealizedPnlPct)}%` : '—'}

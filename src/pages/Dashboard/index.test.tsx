@@ -100,17 +100,19 @@ describe('Dashboard', () => {
   })
 
   it('displays correct TW total market value', async () => {
-    // 0050: 10 shares × price 120 = 1,200 TWD
+    // 0050: 10 shares × price 120 = 1,200 TWD (appears in card and table row)
     renderDashboard()
     await screen.findByText('0050')
-    expect(screen.getByText('TWD 1,200')).toBeInTheDocument()
+    const twdValues = screen.getAllByText('TWD 1,200')
+    expect(twdValues.length).toBeGreaterThanOrEqual(1)
   })
 
   it('displays correct US total market value', async () => {
-    // AAPL: 5 shares × price 180 = 900 USD
+    // AAPL: 5 shares × price 180 = 900 USD (appears in card and table row)
     renderDashboard()
     await screen.findByText('AAPL')
-    expect(screen.getByText('USD 900')).toBeInTheDocument()
+    const usdValues = screen.getAllByText('USD 900')
+    expect(usdValues.length).toBeGreaterThanOrEqual(1)
   })
 
   it('shows Refresh Prices button in chart section', async () => {
