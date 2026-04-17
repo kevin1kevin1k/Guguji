@@ -68,6 +68,11 @@ export function getDB(): Promise<IDBPDatabase<GugujiDB>> {
           db.createObjectStore('exchange_rates', { keyPath: 'key' })
         }
       },
+      // Close this connection when a newer version wants to upgrade
+      blocking(_currentVersion, _blockedVersion, event) {
+        ;(event.target as IDBOpenDBRequest).result?.close()
+        dbPromise = null
+      },
     })
   }
   return dbPromise
