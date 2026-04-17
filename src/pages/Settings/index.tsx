@@ -15,16 +15,19 @@ export default function Settings() {
   async function handleRefresh() {
     setLoading(true)
     setError(null)
-    const rate = await fetchUsdTwd()
-    if (rate === null) {
-      setError('匯率取得失敗，請稍後再試。')
-      setTimeout(() => setError(null), 5000)
-    } else {
-      await ExchangeRateRepository.set(rate)
-      const updated = await ExchangeRateRepository.getEntry()
-      setEntry(updated)
+    try {
+      const rate = await fetchUsdTwd()
+      if (rate === null) {
+        setError('匯率取得失敗，請稍後再試。')
+        setTimeout(() => setError(null), 5000)
+      } else {
+        await ExchangeRateRepository.set(rate)
+        const updated = await ExchangeRateRepository.getEntry()
+        setEntry(updated)
+      }
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
