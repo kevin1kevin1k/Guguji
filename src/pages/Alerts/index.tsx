@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { AlertRepository } from '../../db/AlertRepository'
 import { generateId } from '../../utils/id'
 import type { Alert, Market } from '../../types'
@@ -17,11 +17,11 @@ export default function Alerts() {
   const [repeat, setRepeat] = useState(false)
   const [error, setError] = useState('')
 
-  async function load() {
+  const load = useCallback(async () => {
     setAlerts(await AlertRepository.getAll())
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
 
   function handleTickerChange(value: string) {
     setTicker(value)
@@ -37,30 +37,42 @@ export default function Alerts() {
     if (slNum === null && tpNum === null) return setError('Set at least one price.')
     if (slNum !== null && (isNaN(slNum) || slNum <= 0)) return setError('Stop-loss must be a positive number.')
     if (tpNum !== null && (isNaN(tpNum) || tpNum <= 0)) return setError('Take-profit must be a positive number.')
-    await AlertRepository.upsert({
-      id: generateId(),
-      ticker: ticker.trim().toUpperCase(),
-      market,
-      stopLossPrice: slNum,
-      takeProfitPrice: tpNum,
-      repeat,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-    })
-    setTicker(''); setMarket('TW'); setMarketOverridden(false)
-    setStopLoss(''); setTakeProfit(''); setRepeat(false)
-    await load()
+    try {
+      await AlertRepository.upsert({
+        id: generateId(),
+        ticker: ticker.trim().toUpperCase(),
+        market,
+        stopLossPrice: slNum,
+        takeProfitPrice: tpNum,
+        repeat,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      })
+      setTicker(''); setMarket('TW'); setMarketOverridden(false)
+      setStopLoss(''); setTakeProfit(''); setRepeat(false)
+      await load()
+    } catch {
+      setError('Failed to save alert. Please try again.')
+    }
   }
 
   async function handleToggleActive(alert: Alert) {
-    await AlertRepository.upsert({ ...alert, isActive: !alert.isActive })
-    await load()
+    try {
+      await AlertRepository.upsert({ ...alert, isActive: !alert.isActive })
+      await load()
+    } catch (err) {
+      console.error(err)
+    }
   }
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this alert?')) return
-    await AlertRepository.delete(id)
-    await load()
+    try {
+      await AlertRepository.delete(id)
+      await load()
+    } catch (err) {
+      console.error(err)
+    }
   }
 
   return (
