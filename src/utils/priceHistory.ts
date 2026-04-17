@@ -2,6 +2,7 @@ import type { PriceHistory, Market } from '../types'
 import { PriceHistoryRepository } from '../db/PriceHistoryRepository'
 
 const YAHOO_BASE = 'https://query1.finance.yahoo.com/v8/finance/chart'
+const CORS_PROXY = 'https://api.allorigins.win/raw?url='
 
 function yahooSymbol(ticker: string, market: Market): string {
   return market === 'TW' ? `${ticker}.TW` : ticker
@@ -31,7 +32,8 @@ export async function fetchYahooHistory(
 ): Promise<PriceHistory[]> {
   try {
     const symbol = yahooSymbol(ticker, market)
-    const url = `${YAHOO_BASE}/${symbol}?interval=1d&range=5y`
+    const yahooUrl = `${YAHOO_BASE}/${symbol}?interval=1d&range=5y`
+    const url = `${CORS_PROXY}${encodeURIComponent(yahooUrl)}`
     const res = await fetch(url)
     if (!res.ok) return []
     const data = await res.json()
