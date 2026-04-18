@@ -2,10 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import Settings from './index'
 import { ExchangeRateRepository } from '../../db/ExchangeRateRepository'
+import { SettingsRepository } from '../../db/SettingsRepository'
 import { fetchUsdTwd } from '../../utils/exchangeRate'
 
 vi.mock('../../db/ExchangeRateRepository', () => ({
   ExchangeRateRepository: { getUsdTwd: vi.fn(), getEntry: vi.fn(), set: vi.fn() },
+}))
+vi.mock('../../db/SettingsRepository', () => ({
+  SettingsRepository: { get: vi.fn(), set: vi.fn() },
+  FINMIND_TOKEN_KEY: 'finmind_token',
 }))
 vi.mock('../../utils/exchangeRate', () => ({
   fetchUsdTwd: vi.fn(),
@@ -22,6 +27,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(ExchangeRateRepository.getEntry).mockResolvedValue(null)
   vi.mocked(ExchangeRateRepository.set).mockResolvedValue(undefined)
+  vi.mocked(SettingsRepository.get).mockResolvedValue(null)
+  vi.mocked(SettingsRepository.set).mockResolvedValue(undefined)
 })
 
 describe('Settings', () => {
@@ -89,5 +96,24 @@ describe('Settings', () => {
     renderSettings()
     expect(await screen.findByText(/已啟用/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /啟用通知/ })).not.toBeInTheDocument()
+  })
+
+  it('loads saved token on mount', async () => {
+    vi.mocked(SettingsRepository.get).mockResolvedValue('mytoken')
+    renderSettings()
+    const input = await screen.findByLabelText('API Token') as HTMLInputElement
+    expect(input.value).toBe('mytoken')
+  })
+
+  it('save token button calls SettingsRepository.set', async () => {
+    renderSettings()
+    const input = await screen.findByLabelText('API Token')
+    fireEvent.change(input, { target: { value: 'newtoken' } })
+    const btn = screen.getByRole('button', { name: /儲存 Token/ })
+    fireEvent.click(btn)
+    await waitFor(() =>
+      expect(vi.mocked(SettingsRepository.set)).toHaveBeenCalledWith('finmind_token', 'newtoken')
+    )
+    expect(await screen.findByText('Token 已儲存。')).toBeInTheDocument()
   })
 })

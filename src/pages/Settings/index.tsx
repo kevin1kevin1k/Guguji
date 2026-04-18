@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ExchangeRateRepository } from '../../db/ExchangeRateRepository'
+import { SettingsRepository, FINMIND_TOKEN_KEY } from '../../db/SettingsRepository'
 import { fetchUsdTwd } from '../../utils/exchangeRate'
 import { requestNotificationPermission } from '../../utils/notification'
 import type { ExchangeRate } from '../../types'
@@ -9,6 +10,9 @@ export default function Settings() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default')
+  const [finmindToken, setFinmindToken] = useState('')
+  const [savingToken, setSavingToken] = useState(false)
+  const [tokenSaved, setTokenSaved] = useState(false)
 
   useEffect(() => {
     ExchangeRateRepository.getEntry().then(setEntry)
@@ -20,12 +24,32 @@ export default function Settings() {
     }
   }, [])
 
+  useEffect(() => {
+    SettingsRepository.get(FINMIND_TOKEN_KEY).then((t) => {
+      if (t) setFinmindToken(t)
+    })
+  }, [])
+
   async function handleRequestPermission() {
     try {
       const permission = await requestNotificationPermission()
       setNotifPermission(permission)
     } catch {
       // requestPermission() can reject in some environments; silently ignore
+    }
+  }
+
+  async function handleSaveFinmindToken() {
+    setSavingToken(true)
+    setTokenSaved(false)
+    try {
+      await SettingsRepository.set(FINMIND_TOKEN_KEY, finmindToken.trim())
+      setTokenSaved(true)
+      setTimeout(() => setTokenSaved(false), 3000)
+    } catch {
+      // silently ignore
+    } finally {
+      setSavingToken(false)
     }
   }
 
@@ -88,6 +112,31 @@ export default function Settings() {
             </button>
           )}
         </div>
+      </div>
+
+      <div className="border rounded-lg p-4 max-w-sm mt-4">
+        <h3 className="text-sm font-medium text-gray-700 mb-3">FinMind API</h3>
+        <div className="mb-3">
+          <label htmlFor="finmind-token" className="block text-xs text-gray-500 mb-1">
+            API Token
+          </label>
+          <input
+            id="finmind-token"
+            type="password"
+            className="w-full border rounded px-3 py-2 text-sm font-mono"
+            value={finmindToken}
+            onChange={(e) => setFinmindToken(e.target.value)}
+            placeholder="貼上 FinMind token"
+          />
+        </div>
+        <button
+          onClick={handleSaveFinmindToken}
+          disabled={savingToken}
+          className="w-full px-3 py-1.5 text-sm rounded border text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+        >
+          {savingToken ? '儲存中…' : '儲存 Token'}
+        </button>
+        {tokenSaved && <p className="text-xs text-green-600 mt-2">Token 已儲存。</p>}
       </div>
     </div>
   )
