@@ -3,7 +3,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import Settings from './index'
 import { ExchangeRateRepository } from '../../db/ExchangeRateRepository'
 import { fetchUsdTwd } from '../../utils/exchangeRate'
-import { requestNotificationPermission } from '../../utils/notification'
 
 vi.mock('../../db/ExchangeRateRepository', () => ({
   ExchangeRateRepository: { getUsdTwd: vi.fn(), getEntry: vi.fn(), set: vi.fn() },
