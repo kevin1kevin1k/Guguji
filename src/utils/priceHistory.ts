@@ -1,5 +1,7 @@
 import type { PriceHistory, Market } from '../types'
 import { PriceHistoryRepository } from '../db/PriceHistoryRepository'
+import { SettingsRepository, FINMIND_TOKEN_KEY } from '../db/SettingsRepository'
+import { fetchFinmindHistory } from './finmind'
 
 const YAHOO_BASE = 'https://query1.finance.yahoo.com/v8/finance/chart'
 
@@ -61,11 +63,25 @@ export async function fetchYahooHistory(
 export async function refreshPriceHistory(
   tickers: { ticker: string; market: Market }[],
 ): Promise<{ success: string[]; failed: string[] }> {
+  const token = await SettingsRepository.get(FINMIND_TOKEN_KEY)
   const success: string[] = []
   const failed: string[] = []
 
   for (const { ticker, market } of tickers) {
-    const entries = await fetchYahooHistory(ticker, market)
+    let entries: PriceHistory[] = []
+
+    if (market === 'TW' && token) {
+      try {
+        entries = await fetchFinmindHistory(ticker, token)
+      } catch {
+        // fallback to Yahoo below
+      }
+    }
+
+    if (entries.length === 0) {
+      entries = await fetchYahooHistory(ticker, market)
+    }
+
     if (entries.length > 0) {
       await PriceHistoryRepository.bulkSet(entries)
       success.push(`${ticker}:${market}`)
