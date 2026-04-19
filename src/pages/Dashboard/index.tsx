@@ -63,7 +63,7 @@ export default function Dashboard() {
 
     const computed = calcPositions(txs, splits, prices)
     setPositions(computed)
-    setChartPoints(calcPortfolioHistory(txs, splits, prices, histMap.size > 0 ? histMap : undefined))
+    setChartPoints(calcPortfolioHistory(txs, splits, prices, histMap.size > 0 ? histMap : undefined, usdTwd ?? undefined))
     setHasHistory(histMap.size > 0)
     setUsdTwdRate(usdTwd)
     return computed

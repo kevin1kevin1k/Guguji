@@ -37,6 +37,7 @@ export function calcPortfolioHistory(
   splitEvents: SplitEvent[],
   prices: Record<string, number>,           // `${ticker}:${market}` -> current price
   historicalPrices?: Map<string, number>,   // `${ticker}:${market}:${date}` -> open price
+  usdTwdRate?: number,                      // USD→TWD exchange rate for US holdings
 ): ChartPoint[] {
   if (transactions.length === 0) return []
 
@@ -71,7 +72,8 @@ export function calcPortfolioHistory(
         const price = historicalPrices
           ? (findHistoricalPrice(historicalPrices, key, date) ?? (prices[key] ?? 0))
           : (prices[key] ?? 0)
-        value += shares * price
+        const fxRate = key.endsWith(':US') ? (usdTwdRate ?? 1) : 1
+        value += shares * price * fxRate
       }
     }
 
