@@ -11,7 +11,7 @@ import { ExchangeRateRepository } from '../../db/ExchangeRateRepository'
 import { AlertRepository } from '../../db/AlertRepository'
 import { getLatestPrices, checkAlerts } from '../../utils/alertCheck'
 import { showAlertNotification } from '../../utils/notification'
-import type { Transaction, PriceCache } from '../../types'
+import type { Transaction, PriceCache, PriceHistory } from '../../types'
 
 vi.mock('../../db/TransactionRepository', () => ({
   TransactionRepository: { getAll: vi.fn() },
@@ -171,5 +171,51 @@ describe('Dashboard', () => {
     renderDashboard()
     await screen.findByText('0050')
     await waitFor(() => expect(screen.getByText('TWD 28,200')).toBeInTheDocument())
+  })
+
+  it('shows Asset Allocation card when exchange rate is set for mixed markets', async () => {
+    vi.mocked(ExchangeRateRepository.getUsdTwd).mockResolvedValue(30)
+    renderDashboard()
+    await screen.findByText('0050')
+    expect(screen.getByText('Asset Allocation')).toBeInTheDocument()
+    expect(screen.queryByText(/set usd\/twd rate/i)).not.toBeInTheDocument()
+  })
+
+  it('shows Asset Allocation placeholder when exchange rate is missing and both markets present', async () => {
+    vi.mocked(ExchangeRateRepository.getUsdTwd).mockResolvedValue(null)
+    renderDashboard()
+    await screen.findByText('0050')
+    expect(screen.getByText('Asset Allocation')).toBeInTheDocument()
+    expect(screen.getByText(/set usd\/twd rate to view cross-market allocation/i)).toBeInTheDocument()
+  })
+
+  it('renders Asset Allocation using latest history price when price cache is empty', async () => {
+    vi.mocked(PriceCacheRepository.getAll).mockResolvedValue([])
+    const hist: PriceHistory[] = [
+      { key: '0050:TW:2026-04-18', ticker: '0050', market: 'TW', date: '2026-04-18', open: 130 },
+      { key: '0050:TW:2026-04-19', ticker: '0050', market: 'TW', date: '2026-04-19', open: 135 },
+      { key: 'AAPL:US:2026-04-19', ticker: 'AAPL', market: 'US', date: '2026-04-19', open: 200 },
+    ]
+    vi.mocked(PriceHistoryRepository.getAll).mockResolvedValue(hist)
+    vi.mocked(getLatestPrices).mockReturnValue({ '0050:TW': 135, 'AAPL:US': 200 })
+    vi.mocked(ExchangeRateRepository.getUsdTwd).mockResolvedValue(30)
+    renderDashboard()
+    await screen.findByText('0050')
+    expect(screen.getByText('Asset Allocation')).toBeInTheDocument()
+    expect(screen.queryByText(/set usd\/twd rate/i)).not.toBeInTheDocument()
+  })
+
+  it('renders Asset Allocation without placeholder when only TW positions exist without exchange rate', async () => {
+    vi.mocked(TransactionRepository.getAll).mockResolvedValue([
+      {
+        id: '1', ticker: '0050', market: 'TW', type: 'buy',
+        date: '2024-01-01', price: 100, shares: 10, fee: 0, note: '', createdAt: '',
+      },
+    ])
+    vi.mocked(ExchangeRateRepository.getUsdTwd).mockResolvedValue(null)
+    renderDashboard()
+    await screen.findByText('0050')
+    expect(screen.getByText('Asset Allocation')).toBeInTheDocument()
+    expect(screen.queryByText(/set usd\/twd rate/i)).not.toBeInTheDocument()
   })
 })

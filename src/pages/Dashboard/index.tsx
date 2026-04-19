@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
 } from 'recharts'
 import { TransactionRepository } from '../../db/TransactionRepository'
 import { SplitEventRepository } from '../../db/SplitEventRepository'
@@ -31,6 +32,11 @@ const RANGES = ['1M', '3M', '6M', 'YTD', '1Y', '3Y', 'ALL'] as const
 type Range = (typeof RANGES)[number]
 type Tab = 'open' | 'closed'
 
+const PIE_COLORS = [
+  '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
+  '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16',
+]
+
 export default function Dashboard() {
   const [positions, setPositions] = useState<Position[]>([])
   const [chartPoints, setChartPoints] = useState<ChartPoint[]>([])
@@ -41,6 +47,7 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [refreshMsg, setRefreshMsg] = useState<string | null>(null)
   const [usdTwdRate, setUsdTwdRate] = useState<number | null>(null)
+  const [latestHistPrices, setLatestHistPrices] = useState<Record<string, number>>({})
 
   const load = useCallback(async (): Promise<Position[]> => {
     const [txs, splits, caches, histEntries, usdTwd] = await Promise.all([
@@ -66,6 +73,7 @@ export default function Dashboard() {
     setChartPoints(calcPortfolioHistory(txs, splits, prices, histMap.size > 0 ? histMap : undefined, usdTwd ?? undefined))
     setHasHistory(histMap.size > 0)
     setUsdTwdRate(usdTwd)
+    setLatestHistPrices(getLatestPrices(histEntries))
     return computed
   }, [])
 
@@ -128,6 +136,33 @@ export default function Dashboard() {
   const filteredPoints = filterByRange(chartPoints, range)
   const totalTwd = usdTwdRate !== null ? twTotal + usTotal * usdTwdRate : null
 
+  const openPositionsPriced = positions
+    .filter((p) => p.isOpen)
+    .map((p) => {
+      const price = p.currentPrice > 0
+        ? p.currentPrice
+        : latestHistPrices[`${p.ticker}:${p.market}`] ?? 0
+      return { ticker: p.ticker, market: p.market, value: price * p.shares }
+    })
+    .filter((p) => p.value > 0)
+  const hasTwPie = openPositionsPriced.some((p) => p.market === 'TW')
+  const hasUsPie = openPositionsPriced.some((p) => p.market === 'US')
+  const pieNeedsRate = hasTwPie && hasUsPie
+  const canShowPie = openPositionsPriced.length > 0 && (!pieNeedsRate || usdTwdRate !== null)
+  const pieCcy: 'TWD' | 'USD' = hasUsPie && !hasTwPie ? 'USD' : 'TWD'
+  const pieData = canShowPie
+    ? openPositionsPriced
+        .map((p) => ({
+          name: p.ticker,
+          market: p.market,
+          value: p.market === 'US' && usdTwdRate !== null
+            ? p.value * usdTwdRate
+            : p.value,
+        }))
+        .sort((a, b) => b.value - a.value)
+    : []
+  const pieTotal = pieData.reduce((s, d) => s + d.value, 0)
+
   return (
     <div>
       <h2 className="text-xl font-semibold mb-4">Dashboard</h2>
@@ -171,87 +206,130 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Portfolio chart */}
-      {chartPoints.length > 0 && (
-        <div className="border rounded-lg p-4 mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium text-gray-700">
-              Portfolio Value
-              {hasHistory ? ' (historical prices)' : ' (estimated at current prices)'}
-            </p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="px-2 py-0.5 text-xs rounded border text-gray-500 hover:bg-gray-100 disabled:opacity-50"
-              >
-                {refreshing ? 'Refreshing…' : 'Refresh Prices'}
-              </button>
-              {lastUpdated && (
-                <span className="text-xs text-gray-400">
-                  Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              )}
-              <div className="flex gap-1">
-                {RANGES.map((r) => (
+      {/* Portfolio chart + Asset allocation */}
+      {(chartPoints.length > 0 || openPositionsPriced.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          {chartPoints.length > 0 && (
+            <div className={`border rounded-lg p-4 ${openPositionsPriced.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <p className="text-sm font-medium text-gray-700">
+                  Portfolio Value
+                  {hasHistory ? ' (historical prices)' : ' (estimated at current prices)'}
+                </p>
+                <div className="flex items-center gap-2 flex-wrap">
                   <button
-                    key={r}
-                    onClick={() => setRange(r)}
-                    className={`px-2 py-0.5 text-xs rounded ${
-                      range === r
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-500 hover:bg-gray-100'
-                    }`}
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    className="px-2 py-0.5 text-xs rounded border text-gray-500 hover:bg-gray-100 disabled:opacity-50"
                   >
-                    {r}
+                    {refreshing ? 'Refreshing…' : 'Refresh Prices'}
                   </button>
-                ))}
+                  {lastUpdated && (
+                    <span className="text-xs text-gray-400">
+                      Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                  <div className="flex gap-1 flex-wrap">
+                    {RANGES.map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => setRange(r)}
+                        className={`px-2 py-0.5 text-xs rounded ${
+                          range === r
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-500 hover:bg-gray-100'
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
+              {refreshMsg && (
+                <p className="text-xs text-red-600 mb-2" role="status">{refreshMsg}</p>
+              )}
+              {filteredPoints.length < 2 ? (
+                <p className="text-sm text-gray-400 text-center py-8">Not enough data for this range.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <AreaChart data={filteredPoints} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11 }} tickLine={false} />
+                    <YAxis
+                      tick={{ fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v) => {
+                        if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
+                        if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`
+                        return String(v)
+                      }}
+                      width={50}
+                    />
+                    <Tooltip
+                      formatter={(value) => [fmt(Number(value), 0), 'Value']}
+                      labelStyle={{ fontSize: 12 }}
+                      contentStyle={{ fontSize: 12 }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#3b82f6"
+                      strokeWidth={2}
+                      fill="url(#chartGradient)"
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </div>
-          </div>
-          {refreshMsg && (
-            <p className="text-xs text-red-600 mb-2" role="status">{refreshMsg}</p>
           )}
-          {filteredPoints.length < 2 ? (
-            <p className="text-sm text-gray-400 text-center py-8">Not enough data for this range.</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={filteredPoints} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} tickLine={false} />
-                <YAxis
-                  tick={{ fontSize: 11 }}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v) => {
-                    if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`
-                    if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`
-                    return String(v)
-                  }}
-                  width={50}
-                />
-                <Tooltip
-                  formatter={(value) => [fmt(Number(value), 0), 'Value']}
-                  labelStyle={{ fontSize: 12 }}
-                  contentStyle={{ fontSize: 12 }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  fill="url(#chartGradient)"
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+          {openPositionsPriced.length > 0 && (
+            <div className={`border rounded-lg p-4 ${chartPoints.length > 0 ? '' : 'lg:col-span-3'}`}>
+              <p className="text-sm font-medium text-gray-700 mb-3">Asset Allocation</p>
+              {!canShowPie ? (
+                <p className="text-sm text-gray-400 text-center py-8">
+                  Set USD/TWD rate to view cross-market allocation.
+                </p>
+              ) : (
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      label={({ name, percent }) =>
+                        (percent ?? 0) >= 0.03 ? `${name} ${((percent ?? 0) * 100).toFixed(0)}%` : ''
+                      }
+                    >
+                      {pieData.map((_, i) => (
+                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value) => [
+                        `${pieCcy} ${fmt(Number(value), 0)} (${((Number(value) / pieTotal) * 100).toFixed(1)}%)`,
+                        'Value',
+                      ]}
+                      labelStyle={{ fontSize: 12 }}
+                      contentStyle={{ fontSize: 12 }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </div>
           )}
         </div>
       )}
