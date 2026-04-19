@@ -46,8 +46,10 @@ export async function fetchYahooHistory(
   const symbol = yahooSymbol(ticker, market)
   const yahooUrl = `${YAHOO_BASE}/${symbol}?interval=1d&range=5y`
 
-  // Try direct, then each proxy in order
-  const candidates = [yahooUrl, ...CORS_PROXIES.map((p) => p(yahooUrl))]
+  // /api/yahoo-finance: Vercel serverless proxy (production, no CORS)
+  // CORS_PROXIES: fallback for local dev
+  const vercelProxy = `/api/yahoo-finance?symbol=${encodeURIComponent(symbol)}`
+  const candidates = [vercelProxy, yahooUrl, ...CORS_PROXIES.map((p) => p(yahooUrl))]
   for (const url of candidates) {
     try {
       const data = await fetchJson(url)
