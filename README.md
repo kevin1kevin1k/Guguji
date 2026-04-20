@@ -2,6 +2,8 @@
 
 跨平台個人股票資產追蹤工具，支援台股與美股。資料存於本地，無需帳號。
 
+**Deployed at https://guguji.vercel.app/**
+
 ## Tech Stack
 
 | 層次 | 選擇 |
