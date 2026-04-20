@@ -4,6 +4,7 @@ import Settings from './index'
 import { ExchangeRateRepository } from '../../db/ExchangeRateRepository'
 import { SettingsRepository } from '../../db/SettingsRepository'
 import { fetchUsdTwd } from '../../utils/exchangeRate'
+import { useAuth } from '../../contexts/AuthContext'
 
 vi.mock('../../db/ExchangeRateRepository', () => ({
   ExchangeRateRepository: { getUsdTwd: vi.fn(), getEntry: vi.fn(), set: vi.fn() },
@@ -18,6 +19,9 @@ vi.mock('../../utils/exchangeRate', () => ({
 vi.mock('../../utils/notification', () => ({
   requestNotificationPermission: vi.fn(),
 }))
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: vi.fn(),
+}))
 
 function renderSettings() {
   return render(<Settings />)
@@ -29,6 +33,7 @@ beforeEach(() => {
   vi.mocked(ExchangeRateRepository.set).mockResolvedValue(undefined)
   vi.mocked(SettingsRepository.get).mockResolvedValue(null)
   vi.mocked(SettingsRepository.set).mockResolvedValue(undefined)
+  vi.mocked(useAuth).mockReturnValue({ user: null, session: null, loading: false, signIn: vi.fn(), signUp: vi.fn(), signOut: vi.fn() })
 })
 
 describe('Settings', () => {
@@ -115,5 +120,25 @@ describe('Settings', () => {
       expect(vi.mocked(SettingsRepository.set)).toHaveBeenCalledWith('finmind_token', 'newtoken')
     )
     expect(await screen.findByText('Token 已儲存。')).toBeInTheDocument()
+  })
+
+  it('does not show account card when not logged in', async () => {
+    renderSettings()
+    await screen.findByText('匯率')
+    expect(screen.queryByText('帳號')).not.toBeInTheDocument()
+  })
+
+  it('shows account card with email and logout button when logged in', async () => {
+    const signOut = vi.fn()
+    vi.mocked(useAuth).mockReturnValue({
+      user: { email: 'user@example.com' } as never,
+      session: null, loading: false,
+      signIn: vi.fn(), signUp: vi.fn(), signOut,
+    })
+    renderSettings()
+    expect(await screen.findByText('帳號')).toBeInTheDocument()
+    expect(screen.getByText('user@example.com')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '登出' }))
+    expect(signOut).toHaveBeenCalled()
   })
 })

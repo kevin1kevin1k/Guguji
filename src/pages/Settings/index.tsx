@@ -3,9 +3,11 @@ import { ExchangeRateRepository } from '../../db/ExchangeRateRepository'
 import { SettingsRepository, FINMIND_TOKEN_KEY } from '../../db/SettingsRepository'
 import { fetchUsdTwd } from '../../utils/exchangeRate'
 import { requestNotificationPermission } from '../../utils/notification'
+import { useAuth } from '../../contexts/AuthContext'
 import type { ExchangeRate } from '../../types'
 
 export default function Settings() {
+  const { user, signOut } = useAuth()
   const [entry, setEntry] = useState<ExchangeRate | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -138,6 +140,19 @@ export default function Settings() {
         </button>
         {tokenSaved && <p className="text-xs text-green-600 mt-2">Token 已儲存。</p>}
       </div>
+
+      {user && (
+        <div className="border rounded-lg p-4 max-w-sm mt-4">
+          <h3 className="text-sm font-medium text-gray-700 mb-3">帳號</h3>
+          <p className="text-sm text-gray-500 mb-3">{user.email}</p>
+          <button
+            onClick={signOut}
+            className="w-full px-3 py-1.5 text-sm rounded border text-red-600 hover:bg-red-50"
+          >
+            登出
+          </button>
+        </div>
+      )}
     </div>
   )
 }
