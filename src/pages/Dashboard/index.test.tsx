@@ -189,6 +189,22 @@ describe('Dashboard', () => {
     expect(screen.getByText(/set usd\/twd rate to view cross-market allocation/i)).toBeInTheDocument()
   })
 
+  it('uses latest history price for market value cards when price cache is empty', async () => {
+    vi.mocked(TransactionRepository.getAll).mockResolvedValue([
+      {
+        id: '1', ticker: '0050', market: 'TW', type: 'buy',
+        date: '2024-01-01', price: 100, shares: 10, fee: 0, note: '', createdAt: '',
+      },
+    ])
+    vi.mocked(PriceCacheRepository.getAll).mockResolvedValue([])
+    vi.mocked(getLatestPrices).mockReturnValue({ '0050:TW': 135 })
+    renderDashboard()
+    await screen.findByText('0050')
+    // 10 shares × 135 fallback price = 1,350 TWD (appears in card and table row)
+    const values = screen.getAllByText('TWD 1,350')
+    expect(values.length).toBeGreaterThanOrEqual(1)
+  })
+
   it('renders Asset Allocation using latest history price when price cache is empty', async () => {
     vi.mocked(PriceCacheRepository.getAll).mockResolvedValue([])
     const hist: PriceHistory[] = [

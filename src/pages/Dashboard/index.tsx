@@ -47,7 +47,6 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [refreshMsg, setRefreshMsg] = useState<string | null>(null)
   const [usdTwdRate, setUsdTwdRate] = useState<number | null>(null)
-  const [latestHistPrices, setLatestHistPrices] = useState<Record<string, number>>({})
 
   const load = useCallback(async (): Promise<Position[]> => {
     const [txs, splits, caches, histEntries, usdTwd] = await Promise.all([
@@ -62,6 +61,10 @@ export default function Dashboard() {
     for (const c of caches) {
       prices[`${c.ticker}:${c.market}`] = c.price
     }
+    const latestHist = getLatestPrices(histEntries)
+    for (const [k, v] of Object.entries(latestHist)) {
+      if (!(k in prices)) prices[k] = v
+    }
 
     const histMap = new Map<string, number>()
     for (const h of histEntries) {
@@ -73,7 +76,6 @@ export default function Dashboard() {
     setChartPoints(calcPortfolioHistory(txs, splits, prices, histMap.size > 0 ? histMap : undefined, usdTwd ?? undefined))
     setHasHistory(histMap.size > 0)
     setUsdTwdRate(usdTwd)
-    setLatestHistPrices(getLatestPrices(histEntries))
     return computed
   }, [])
 
@@ -136,15 +138,7 @@ export default function Dashboard() {
   const filteredPoints = filterByRange(chartPoints, range)
   const totalTwd = usdTwdRate !== null ? twTotal + usTotal * usdTwdRate : null
 
-  const openPositionsPriced = positions
-    .filter((p) => p.isOpen)
-    .map((p) => {
-      const price = p.currentPrice > 0
-        ? p.currentPrice
-        : latestHistPrices[`${p.ticker}:${p.market}`] ?? 0
-      return { ticker: p.ticker, market: p.market, value: price * p.shares }
-    })
-    .filter((p) => p.value > 0)
+  const openPositionsPriced = positions.filter((p) => p.isOpen && p.currentPrice > 0)
   const hasTwPie = openPositionsPriced.some((p) => p.market === 'TW')
   const hasUsPie = openPositionsPriced.some((p) => p.market === 'US')
   const pieNeedsRate = hasTwPie && hasUsPie
@@ -156,8 +150,8 @@ export default function Dashboard() {
           name: p.ticker,
           market: p.market,
           value: p.market === 'US' && usdTwdRate !== null
-            ? p.value * usdTwdRate
-            : p.value,
+            ? p.currentValue * usdTwdRate
+            : p.currentValue,
         }))
         .sort((a, b) => b.value - a.value)
     : []
