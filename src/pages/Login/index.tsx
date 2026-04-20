@@ -43,12 +43,14 @@ export function Login() {
       <h1 className="text-2xl font-bold mb-6 text-center">股股記 Guguji</h1>
       <div className="flex border-b mb-6">
         <button
+          type="button"
           className={`flex-1 py-2 text-sm font-medium ${tab === 'signin' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
           onClick={() => { setTab('signin'); setError(null); setMessage(null) }}
         >
           登入
         </button>
         <button
+          type="button"
           className={`flex-1 py-2 text-sm font-medium ${tab === 'signup' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
           onClick={() => { setTab('signup'); setError(null); setMessage(null) }}
         >
@@ -57,8 +59,9 @@ export function Login() {
       </div>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Email</label>
+          <label htmlFor="login-email" className="block text-sm font-medium mb-1">Email</label>
           <input
+            id="login-email"
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
@@ -67,8 +70,9 @@ export function Login() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">密碼</label>
+          <label htmlFor="login-password" className="block text-sm font-medium mb-1">密碼</label>
           <input
+            id="login-password"
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
