@@ -6,6 +6,11 @@ export interface ChartPoint {
   value: number
 }
 
+export interface ChartFilter {
+  market?: 'TW' | 'US'
+  ticker?: string
+}
+
 /**
  * Finds the most recent historical price within maxDaysBack days of `date`.
  * Returns undefined if no price found within the window.
@@ -38,6 +43,7 @@ export function calcPortfolioHistory(
   prices: Record<string, number>,           // `${ticker}:${market}` -> current price
   historicalPrices?: Map<string, number>,   // `${ticker}:${market}:${date}` -> open price
   usdTwdRate?: number,                      // USD→TWD exchange rate for US holdings
+  filter?: ChartFilter,                     // restrict to specific market or ticker
 ): ChartPoint[] {
   if (transactions.length === 0) return []
 
@@ -68,6 +74,11 @@ export function calcPortfolioHistory(
 
     let value = 0
     for (const [key, shares] of sharesMap) {
+      if (filter) {
+        const [tkr, mkt] = key.split(':')
+        if (filter.market && mkt !== filter.market) continue
+        if (filter.ticker && tkr !== filter.ticker) continue
+      }
       if (shares > 0.00001) {
         const price = historicalPrices
           ? (findHistoricalPrice(historicalPrices, key, date) ?? (prices[key] ?? 0))

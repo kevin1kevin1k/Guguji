@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcPortfolioHistory, filterByRange } from './chartData'
+import { calcPortfolioHistory, filterByRange, type ChartFilter } from './chartData'
 import type { Transaction } from '../types'
 
 const tx = (overrides: Partial<Transaction>): Transaction => ({
@@ -100,6 +100,33 @@ describe('calcPortfolioHistory', () => {
     const without = calcPortfolioHistory(txs, [], prices)
     const withUndef = calcPortfolioHistory(txs, [], prices, undefined)
     expect(without).toEqual(withUndef)
+  })
+
+  describe('filter', () => {
+    const mixedTxs = [
+      tx({ id: '1', ticker: '0050', market: 'TW', shares: 10, date: '2024-01-01' }),
+      tx({ id: '2', ticker: 'AAPL', market: 'US', shares: 5, date: '2024-01-01' }),
+    ]
+    const mixedPrices = { '0050:TW': 120, 'AAPL:US': 200 }
+
+    it('filter { market: TW } only includes TW positions', () => {
+      const points = calcPortfolioHistory(mixedTxs, [], mixedPrices, undefined, undefined, { market: 'TW' })
+      const jan = points.find((p) => p.date === '2024-01-01')!
+      expect(jan.value).toBeCloseTo(10 * 120)
+    })
+
+    it('filter { ticker, market } only includes that single stock', () => {
+      const filter: ChartFilter = { ticker: '0050', market: 'TW' }
+      const points = calcPortfolioHistory(mixedTxs, [], mixedPrices, undefined, undefined, filter)
+      const jan = points.find((p) => p.date === '2024-01-01')!
+      expect(jan.value).toBeCloseTo(10 * 120)
+    })
+
+    it('filter { market: US } with usdTwdRate converts to TWD', () => {
+      const points = calcPortfolioHistory(mixedTxs, [], mixedPrices, undefined, 30, { market: 'US' })
+      const jan = points.find((p) => p.date === '2024-01-01')!
+      expect(jan.value).toBeCloseTo(5 * 200 * 30)
+    })
   })
 })
 
