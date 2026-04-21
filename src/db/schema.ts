@@ -41,7 +41,7 @@ interface GugujiDB extends DBSchema {
 }
 
 const DB_NAME = 'guguji'
-const DB_VERSION = 4
+const DB_VERSION = 5
 
 let dbPromise: Promise<IDBPDatabase<GugujiDB>> | null = null
 
@@ -73,6 +73,12 @@ export function getDB(): Promise<IDBPDatabase<GugujiDB>> {
         }
         if (oldVersion < 4) {
           db.createObjectStore('settings', { keyPath: 'key' })
+        }
+        if (oldVersion < 5) {
+          // Fix: ensure settings exists for DBs that reached v4 before this store was added
+          if (!db.objectStoreNames.contains('settings')) {
+            db.createObjectStore('settings', { keyPath: 'key' })
+          }
         }
       },
       // Close this connection when a newer version wants to upgrade
