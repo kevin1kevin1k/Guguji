@@ -29,6 +29,19 @@ export default defineConfig({
   server: {
     port: 5200,
     strictPort: false,
+    proxy: {
+      '/api/yahoo-finance': {
+        target: 'https://query1.finance.yahoo.com',
+        changeOrigin: true,
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        rewrite: (path) => {
+          const qsStart = path.indexOf('?')
+          const params = new URLSearchParams(qsStart >= 0 ? path.slice(qsStart + 1) : '')
+          const symbol = params.get('symbol') ?? ''
+          return `/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5y`
+        },
+      },
+    },
   },
   test: {
     environment: 'jsdom',
