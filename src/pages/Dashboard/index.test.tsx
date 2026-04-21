@@ -256,13 +256,13 @@ describe('Dashboard', () => {
     expect(chipLabels).not.toContain('2330')
   })
 
-  it('shows chart rate placeholder when switching to US view without exchange rate', async () => {
+  it('shows US view chart without needing exchange rate', async () => {
     vi.mocked(ExchangeRateRepository.getUsdTwd).mockResolvedValue(null)
     renderDashboard()
     await screen.findByRole('link', { name: '0050' })
     fireEvent.click(screen.getByRole('button', { name: 'US' }))
     await waitFor(() =>
-      expect(screen.getByText(/set usd\/twd rate to view this chart/i)).toBeInTheDocument()
+      expect(screen.queryByText(/set usd\/twd rate to view this chart/i)).not.toBeInTheDocument()
     )
   })
 

@@ -56,9 +56,9 @@ function chartViewTitle(view: string, hasHistory: boolean): string {
   const suffix = hasHistory ? ' (historical prices)' : ' (estimated at current prices)'
   if (view === 'all') return `Portfolio Value${suffix}`
   if (view === 'TW') return `TW Portfolio Value${suffix}`
-  if (view === 'US') return `US Portfolio Value (TWD)${suffix}`
-  const [ticker] = view.split(':')
-  return `${ticker} 持倉市值 (TWD)${suffix}`
+  if (view === 'US') return `US Portfolio Value (USD)${suffix}`
+  const [ticker, market] = view.split(':')
+  return `${ticker} 持倉市值 (${market === 'US' ? 'USD' : 'TWD'})${suffix}`
 }
 
 export default function Dashboard() {
@@ -106,21 +106,24 @@ export default function Dashboard() {
   useEffect(() => { load() }, [load])
 
   const viewNeedsRate = useMemo(() => {
-    if (chartView === 'US' || chartView.endsWith(':US')) return true
     if (chartView === 'all') {
       const hasTw = rawData?.txs.some((t) => t.market === 'TW') ?? false
       const hasUs = rawData?.txs.some((t) => t.market === 'US') ?? false
       return hasTw && hasUs
     }
-    return false
+    return false  // US-only views show USD directly; no rate needed
   }, [chartView, rawData])
+
+  const chartCcy = (chartView === 'US' || chartView.endsWith(':US')) ? 'USD' : 'TWD'
 
   const chartPoints = useMemo((): ChartPoint[] => {
     if (!rawData) return []
     if (viewNeedsRate && rawData.usdTwdRate === null) return []
+    // US-only views: skip rate conversion so values stay in USD
+    const usdTwdForChart = chartView === 'all' ? (rawData.usdTwdRate ?? undefined) : undefined
     return calcPortfolioHistory(
       rawData.txs, rawData.splits, rawData.prices,
-      rawData.histMap, rawData.usdTwdRate ?? undefined,
+      rawData.histMap, usdTwdForChart,
       deriveFilter(chartView),
     )
   }, [rawData, chartView, viewNeedsRate])
@@ -344,7 +347,7 @@ export default function Dashboard() {
                       width={50}
                     />
                     <Tooltip
-                      formatter={(value) => [fmt(Number(value), 0), 'Value']}
+                      formatter={(value) => [`${chartCcy} ${fmt(Number(value), 0)}`, 'Value']}
                       labelStyle={{ fontSize: 12 }}
                       contentStyle={{ fontSize: 12 }}
                     />
