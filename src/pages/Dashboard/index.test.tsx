@@ -86,18 +86,18 @@ beforeEach(() => {
 describe('Dashboard', () => {
   it('shows open positions by default', async () => {
     renderDashboard()
-    expect(await screen.findByText('0050')).toBeInTheDocument()
-    expect(screen.getByText('AAPL')).toBeInTheDocument()
-    // 2330 is closed
-    expect(screen.queryByText('2330')).not.toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: '0050' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'AAPL' })).toBeInTheDocument()
+    // 2330 is closed — link not in table
+    expect(screen.queryByRole('link', { name: '2330' })).not.toBeInTheDocument()
   })
 
   it('shows closed positions when Closed tab is clicked', async () => {
     renderDashboard()
-    await screen.findByText('0050')
+    await screen.findByRole('link', { name: '0050' })
     fireEvent.click(screen.getByRole('button', { name: /closed/i }))
-    await waitFor(() => expect(screen.getByText('2330')).toBeInTheDocument())
-    expect(screen.queryByText('0050')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('link', { name: '2330' })).toBeInTheDocument())
+    expect(screen.queryByRole('link', { name: '0050' })).not.toBeInTheDocument()
   })
 
   it('shows empty state when no positions', async () => {
@@ -109,7 +109,7 @@ describe('Dashboard', () => {
   it('shows — for price when no cache entry', async () => {
     vi.mocked(PriceCacheRepository.getAll).mockResolvedValue([])
     renderDashboard()
-    await screen.findByText('0050')
+    await screen.findByRole('link', { name: '0050' })
     const dashes = screen.getAllByText('—')
     // Price, Value, P&L, P&L% columns for each position = 4 per position × 2 open positions
     expect(dashes.length).toBeGreaterThanOrEqual(4)
@@ -118,7 +118,7 @@ describe('Dashboard', () => {
   it('displays correct TW total market value', async () => {
     // 0050: 10 shares × price 120 = 1,200 TWD (appears in card and table row)
     renderDashboard()
-    await screen.findByText('0050')
+    await screen.findByRole('link', { name: '0050' })
     const twdValues = screen.getAllByText('TWD 1,200')
     expect(twdValues.length).toBeGreaterThanOrEqual(1)
   })
@@ -126,20 +126,20 @@ describe('Dashboard', () => {
   it('displays correct US total market value', async () => {
     // AAPL: 5 shares × price 180 = 900 USD (appears in card and table row)
     renderDashboard()
-    await screen.findByText('AAPL')
+    await screen.findByRole('link', { name: 'AAPL' })
     const usdValues = screen.getAllByText('USD 900')
     expect(usdValues.length).toBeGreaterThanOrEqual(1)
   })
 
   it('shows Refresh Prices button in chart section', async () => {
     renderDashboard()
-    await screen.findByText('0050')
+    await screen.findByRole('link', { name: '0050' })
     expect(screen.getByRole('button', { name: /refresh prices/i })).toBeInTheDocument()
   })
 
   it('calls refreshPriceHistory when Refresh Prices button is clicked', async () => {
     renderDashboard()
-    await screen.findByText('0050')
+    await screen.findByRole('link', { name: '0050' })
     const btn = screen.getByRole('button', { name: /refresh prices/i })
     fireEvent.click(btn)
     await waitFor(() => expect(vi.mocked(refreshPriceHistory)).toHaveBeenCalledTimes(1))
@@ -147,7 +147,7 @@ describe('Dashboard', () => {
 
   it('checks alerts after refreshing prices', async () => {
     renderDashboard()
-    await screen.findByText('0050')
+    await screen.findByRole('link', { name: '0050' })
     const btn = screen.getByRole('button', { name: /refresh prices/i })
     fireEvent.click(btn)
     await waitFor(() => expect(vi.mocked(AlertRepository.getAll)).toHaveBeenCalled())
@@ -159,7 +159,7 @@ describe('Dashboard', () => {
   it('shows Total (TWD) card with — when no exchange rate', async () => {
     vi.mocked(ExchangeRateRepository.getUsdTwd).mockResolvedValue(null)
     renderDashboard()
-    await screen.findByText('0050')
+    await screen.findByRole('link', { name: '0050' })
     expect(screen.getByText('Total (TWD)')).toBeInTheDocument()
   })
 
@@ -169,14 +169,14 @@ describe('Dashboard', () => {
     // totalTwd = 1200 + 900 × 30 = 28,200
     vi.mocked(ExchangeRateRepository.getUsdTwd).mockResolvedValue(30)
     renderDashboard()
-    await screen.findByText('0050')
+    await screen.findByRole('link', { name: '0050' })
     await waitFor(() => expect(screen.getByText('TWD 28,200')).toBeInTheDocument())
   })
 
   it('shows Asset Allocation card when exchange rate is set for mixed markets', async () => {
     vi.mocked(ExchangeRateRepository.getUsdTwd).mockResolvedValue(30)
     renderDashboard()
-    await screen.findByText('0050')
+    await screen.findByRole('link', { name: '0050' })
     expect(screen.getByText('Asset Allocation')).toBeInTheDocument()
     expect(screen.queryByText(/set usd\/twd rate/i)).not.toBeInTheDocument()
   })
@@ -184,7 +184,7 @@ describe('Dashboard', () => {
   it('shows Asset Allocation placeholder when exchange rate is missing and both markets present', async () => {
     vi.mocked(ExchangeRateRepository.getUsdTwd).mockResolvedValue(null)
     renderDashboard()
-    await screen.findByText('0050')
+    await screen.findByRole('link', { name: '0050' })
     expect(screen.getByText('Asset Allocation')).toBeInTheDocument()
     expect(screen.getByText(/set usd\/twd rate to view cross-market allocation/i)).toBeInTheDocument()
   })
@@ -199,7 +199,7 @@ describe('Dashboard', () => {
     vi.mocked(PriceCacheRepository.getAll).mockResolvedValue([])
     vi.mocked(getLatestPrices).mockReturnValue({ '0050:TW': 135 })
     renderDashboard()
-    await screen.findByText('0050')
+    await screen.findByRole('link', { name: '0050' })
     // 10 shares × 135 fallback price = 1,350 TWD (appears in card and table row)
     const values = screen.getAllByText('TWD 1,350')
     expect(values.length).toBeGreaterThanOrEqual(1)
@@ -216,7 +216,7 @@ describe('Dashboard', () => {
     vi.mocked(getLatestPrices).mockReturnValue({ '0050:TW': 135, 'AAPL:US': 200 })
     vi.mocked(ExchangeRateRepository.getUsdTwd).mockResolvedValue(30)
     renderDashboard()
-    await screen.findByText('0050')
+    await screen.findByRole('link', { name: '0050' })
     expect(screen.getByText('Asset Allocation')).toBeInTheDocument()
     expect(screen.queryByText(/set usd\/twd rate/i)).not.toBeInTheDocument()
   })
@@ -230,8 +230,47 @@ describe('Dashboard', () => {
     ])
     vi.mocked(ExchangeRateRepository.getUsdTwd).mockResolvedValue(null)
     renderDashboard()
-    await screen.findByText('0050')
+    await screen.findByRole('link', { name: '0050' })
     expect(screen.getByText('Asset Allocation')).toBeInTheDocument()
     expect(screen.queryByText(/set usd\/twd rate/i)).not.toBeInTheDocument()
+  })
+
+  it('shows All chip as active by default', async () => {
+    renderDashboard()
+    await screen.findByRole('link', { name: '0050' })
+    const allChip = screen.getByRole('button', { name: 'All' })
+    expect(allChip.className).toContain('bg-blue-600')
+  })
+
+  it('shows chips for each open position', async () => {
+    renderDashboard()
+    await screen.findByRole('link', { name: '0050' })
+    // Should have TW, US market chips plus individual stock chips
+    expect(screen.getByRole('button', { name: 'TW' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'US' })).toBeInTheDocument()
+    // 0050 and AAPL are open; 2330 is closed (sold)
+    const chipButtons = screen.getAllByRole('button')
+    const chipLabels = chipButtons.map((b) => b.textContent)
+    expect(chipLabels).toContain('0050')
+    expect(chipLabels).toContain('AAPL')
+    expect(chipLabels).not.toContain('2330')
+  })
+
+  it('shows chart rate placeholder when switching to US view without exchange rate', async () => {
+    vi.mocked(ExchangeRateRepository.getUsdTwd).mockResolvedValue(null)
+    renderDashboard()
+    await screen.findByRole('link', { name: '0050' })
+    fireEvent.click(screen.getByRole('button', { name: 'US' }))
+    await waitFor(() =>
+      expect(screen.getByText(/set usd\/twd rate to view this chart/i)).toBeInTheDocument()
+    )
+  })
+
+  it('activates clicked chip', async () => {
+    renderDashboard()
+    await screen.findByRole('link', { name: '0050' })
+    const twChip = screen.getByRole('button', { name: 'TW' })
+    fireEvent.click(twChip)
+    await waitFor(() => expect(twChip.className).toContain('bg-blue-600'))
   })
 })

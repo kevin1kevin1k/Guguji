@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -10,7 +10,7 @@ import { PriceCacheRepository } from '../../db/PriceCacheRepository'
 import { PriceHistoryRepository } from '../../db/PriceHistoryRepository'
 import { ExchangeRateRepository } from '../../db/ExchangeRateRepository'
 import { calcPositions } from '../../utils/position'
-import { calcPortfolioHistory, filterByRange, type ChartPoint } from '../../utils/chartData'
+import { calcPortfolioHistory, filterByRange, type ChartPoint, type ChartFilter } from '../../utils/chartData'
 import { refreshPriceHistory } from '../../utils/priceHistory'
 import { AlertRepository } from '../../db/AlertRepository'
 import { checkAlerts, getLatestPrices } from '../../utils/alertCheck'
@@ -37,16 +37,42 @@ const PIE_COLORS = [
   '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16',
 ]
 
+type RawData = {
+  txs: Transaction[]
+  splits: SplitEvent[]
+  prices: Record<string, number>
+  histMap: Map<string, number> | undefined
+  usdTwdRate: number | null
+}
+
+function deriveFilter(view: string): ChartFilter | undefined {
+  if (view === 'all') return undefined
+  if (view === 'TW' || view === 'US') return { market: view as 'TW' | 'US' }
+  const [ticker, market] = view.split(':')
+  return { market: market as 'TW' | 'US', ticker }
+}
+
+function chartViewTitle(view: string, hasHistory: boolean): string {
+  const suffix = hasHistory ? ' (historical prices)' : ' (estimated at current prices)'
+  if (view === 'all') return `Portfolio Value${suffix}`
+  if (view === 'TW') return `TW Portfolio Value${suffix}`
+  if (view === 'US') return `US Portfolio Value (TWD)${suffix}`
+  const [ticker] = view.split(':')
+  return `${ticker} 持倉市值 (TWD)${suffix}`
+}
+
 export default function Dashboard() {
   const [positions, setPositions] = useState<Position[]>([])
-  const [chartPoints, setChartPoints] = useState<ChartPoint[]>([])
+  const [rawData, setRawData] = useState<RawData | null>(null)
+  const [chartView, setChartView] = useState<string>('all')
   const [range, setRange] = useState<Range>('1Y')
   const [tab, setTab] = useState<Tab>('open')
-  const [hasHistory, setHasHistory] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [refreshMsg, setRefreshMsg] = useState<string | null>(null)
-  const [usdTwdRate, setUsdTwdRate] = useState<number | null>(null)
+
+  const usdTwdRate = rawData?.usdTwdRate ?? null
+  const hasHistory = rawData?.histMap != null
 
   const load = useCallback(async (): Promise<Position[]> => {
     const [txs, splits, caches, histEntries, usdTwd] = await Promise.all([
@@ -73,13 +99,41 @@ export default function Dashboard() {
 
     const computed = calcPositions(txs, splits, prices)
     setPositions(computed)
-    setChartPoints(calcPortfolioHistory(txs, splits, prices, histMap.size > 0 ? histMap : undefined, usdTwd ?? undefined))
-    setHasHistory(histMap.size > 0)
-    setUsdTwdRate(usdTwd)
+    setRawData({ txs, splits, prices, histMap: histMap.size > 0 ? histMap : undefined, usdTwdRate: usdTwd })
     return computed
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  const viewNeedsRate = useMemo(() => {
+    if (chartView === 'US' || chartView.endsWith(':US')) return true
+    if (chartView === 'all') {
+      const hasTw = rawData?.txs.some((t) => t.market === 'TW') ?? false
+      const hasUs = rawData?.txs.some((t) => t.market === 'US') ?? false
+      return hasTw && hasUs
+    }
+    return false
+  }, [chartView, rawData])
+
+  const chartPoints = useMemo((): ChartPoint[] => {
+    if (!rawData) return []
+    if (viewNeedsRate && rawData.usdTwdRate === null) return []
+    return calcPortfolioHistory(
+      rawData.txs, rawData.splits, rawData.prices,
+      rawData.histMap, rawData.usdTwdRate ?? undefined,
+      deriveFilter(chartView),
+    )
+  }, [rawData, chartView, viewNeedsRate])
+
+  const chips = useMemo(() => {
+    const open = positions.filter((p) => p.isOpen)
+    return [
+      { label: 'All', value: 'all' },
+      ...(open.some((p) => p.market === 'TW') ? [{ label: 'TW', value: 'TW' }] : []),
+      ...(open.some((p) => p.market === 'US') ? [{ label: 'US', value: 'US' }] : []),
+      ...open.map((p) => ({ label: p.ticker, value: `${p.ticker}:${p.market}` })),
+    ]
+  }, [positions])
 
   async function handleRefresh() {
     setRefreshing(true)
@@ -201,14 +255,13 @@ export default function Dashboard() {
       </div>
 
       {/* Portfolio chart + Asset allocation */}
-      {(chartPoints.length > 0 || openPositionsPriced.length > 0) && (
+      {(rawData != null || openPositionsPriced.length > 0) && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-          {chartPoints.length > 0 && (
+          {rawData != null && (
             <div className={`border rounded-lg p-4 ${openPositionsPriced.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
-              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                 <p className="text-sm font-medium text-gray-700">
-                  Portfolio Value
-                  {hasHistory ? ' (historical prices)' : ' (estimated at current prices)'}
+                  {chartViewTitle(chartView, hasHistory)}
                 </p>
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
@@ -240,10 +293,33 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
+              {/* Chart view selector chips */}
+              {chips.length > 1 && (
+                <div className="relative mb-3">
+                  <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
+                    {chips.map((chip) => (
+                      <button
+                        key={chip.value}
+                        onClick={() => setChartView(chip.value)}
+                        className={`shrink-0 px-3 py-1 text-xs rounded-full border transition-colors ${
+                          chartView === chip.value
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'text-gray-500 border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-r from-transparent to-white" />
+                </div>
+              )}
               {refreshMsg && (
                 <p className="text-xs text-red-600 mb-2" role="status">{refreshMsg}</p>
               )}
-              {filteredPoints.length < 2 ? (
+              {viewNeedsRate && rawData?.usdTwdRate === null ? (
+                <p className="text-sm text-gray-400 text-center py-8">Set USD/TWD rate to view this chart.</p>
+              ) : filteredPoints.length < 2 ? (
                 <p className="text-sm text-gray-400 text-center py-8">Not enough data for this range.</p>
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
@@ -287,7 +363,7 @@ export default function Dashboard() {
             </div>
           )}
           {openPositionsPriced.length > 0 && (
-            <div className={`border rounded-lg p-4 ${chartPoints.length > 0 ? '' : 'lg:col-span-3'}`}>
+            <div className={`border rounded-lg p-4 ${rawData != null ? '' : 'lg:col-span-3'}`}>
               <p className="text-sm font-medium text-gray-700 mb-3">Asset Allocation</p>
               {!canShowPie ? (
                 <p className="text-sm text-gray-400 text-center py-8">
