@@ -227,6 +227,9 @@ export default function Dashboard() {
         <div className="border rounded-lg p-4">
           <p className="text-xs text-gray-500 mb-1">US Market Value</p>
           <p className="text-lg font-semibold">USD {fmt(usTotal, 0)}</p>
+          {usdTwdRate !== null && (
+            <p className="text-xs text-gray-400 mt-0.5">≈ TWD {fmt(usTotal * usdTwdRate, 0)}</p>
+          )}
         </div>
         <div className="border rounded-lg p-4">
           <p className="text-xs text-gray-500 mb-1">Today's P&amp;L</p>
